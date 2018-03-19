@@ -162,6 +162,7 @@ INSTALLED_APPS = (
     'compressor',
     'debug_toolbar',
     'migrate_spoken',
+    'django_bleach',
 )
 
 # A sample logging configuration. The only tangible logging
@@ -204,3 +205,6 @@ TEMPLATE_CONTEXT_PROCESSORS += (
 COMPRESS_ROOT = PROJECT_DIR + "/static/"
 COMPRESS_ENABLED = True
 HTML_MINIFY = True
+
+# Which HTML tags are allowed in bleach
+BLEACH_ALLOWED_TAGS = ['p', 'b', 'i', 'u', 'em', 'strong', 'br', 'div']
