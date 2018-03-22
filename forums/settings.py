@@ -1,4 +1,4 @@
-#Custom settings
+# Custom settings
 from os.path import *
 from config import *
 from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
@@ -6,11 +6,10 @@ from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
 PROJECT_DIR = abspath(dirname(__file__) + '/../')
 
 # Django settings for forums project.
-
-DEBUG = True
-#DEBUG = True
-#TEMPLATE_DEBUG = DEBUG
-TEMPLATE_DEBUG = True
+DEBUG = False
+# DEBUG = True
+# TEMPLATE_DEBUG = DEBUG
+TEMPLATE_DEBUG = False
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
@@ -195,11 +194,11 @@ LOGGING = {
 }
 
 AUTH_USER_MODEL = 'spoken_auth.Users'
-AUTHENTICATION_BACKENDS = ( 'spoken_auth.backends.DrupalAuthBackend', )
+AUTHENTICATION_BACKENDS = ('spoken_auth.backends.DrupalAuthBackend', )
 DATABASE_ROUTERS = ['spoken_auth.routers.DrupalAuthRouter']
 TEMPLATE_CONTEXT_PROCESSORS += (
     'django.core.context_processors.request',
-    #'website.context_processors.admin_processor', 
+    # 'website.context_processors.admin_processor',
 )
 
 COMPRESS_ROOT = PROJECT_DIR + "/static/"
