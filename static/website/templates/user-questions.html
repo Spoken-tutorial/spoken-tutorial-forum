@@ -6,7 +6,7 @@
     {% for question in questions %}
         <div class="my-question">
             <span class="title">
-                <a href="{% url 'website:get_question' question.id %}">{{ question.title |bleach}}</a>
+                <a href="{% url 'website:get_question' question.id %}">{{ question.title }}</a>
             </span>
             <br>
             <span class="date">
@@ -17,7 +17,7 @@
             </span>
         </div>
     {% endfor %}
-    
+
     {% if total > 10 %}
         <ul class="pagination pull-right">
             {% for i in total|get_range:"0,10" %}
