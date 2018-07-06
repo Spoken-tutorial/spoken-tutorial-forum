@@ -22,6 +22,10 @@ urlpatterns = patterns('',  # noqa
     url(r'^search/$', 'website.views.search', name='search'),
     url(r'^unanswered-notification/$', 'website.views.unanswered_notification', name='unanswered_notification'),
 
+    #Spam filtering
+    url(r'^question_category/$', 'website.views.question_category', name='question_category'),
+    url(r'^new-question-general/$', 'website.views.new_question_general', name='new_question_general'),
+
     # Ajax helpers
     url(r'^ajax-tutorials/$', 'website.views.ajax_tutorials', name='ajax_tutorials'),
     url(r'^ajax-duration/$', 'website.views.ajax_duration', name='ajax_duration'),

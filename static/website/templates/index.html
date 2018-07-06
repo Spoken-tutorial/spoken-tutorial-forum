@@ -152,12 +152,13 @@ $("#listTable").tablesorter({
             </table>
         </div> <!-- /.panel-body -->
     </div> <!-- /.panel -->
+
+
 {% endblock %}
 
 {% block javascript %}
 <script>
     $(document).ready(function(){
-        
         $carousel = $('.carousel').slick({
             lazyLoad: 'ondemand',
             dots: false,
@@ -172,7 +173,9 @@ $("#listTable").tablesorter({
         });
         $(".slick-prev").unbind();
         $(".slick-next").unbind();
-        
+
+
+
         $(".slick-prev").bind("click", function(e) {
             var current_slide = $carousel.slickCurrentSlide();
             $carousel.slickSetOption("slidesToScroll",3);
@@ -194,8 +197,15 @@ $("#listTable").tablesorter({
             }
             e.preventDefault();
         });
+    {% if messages %}
+    {% for message in messages %}
+        alert("{{ message }}");
+    {% endfor %}
+    {% endif %}
+
     });
     $('span').tooltip();
 </script>
 <script src="{% static 'website/js/nice-bar.js' %}"></script>
+
 {% endblock %}
