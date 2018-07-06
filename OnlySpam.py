@@ -1,8 +1,6 @@
 import pandas as pd
 from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
-from imblearn.over_sampling import SMOTE
-import re
 from sklearn.svm import LinearSVC
 import pickle
 fields = ['Content', 'Spam']
@@ -28,11 +26,6 @@ df['Content'] = df['Content'].apply(remove_tags)
 vectorizer = TfidfVectorizer(stop_words='english')
 
 x_train = vectorizer.fit_transform(df['Content'])
-
-# sm = SMOTE(random_state=42)
-
-# x_train,y_train = sm.fit_sample(x_train,df['Spam'])
-
 
 model = LinearSVC()
 

@@ -62,8 +62,9 @@ def question_category(request):
     context['category'] = request.GET.get('category', None)
     context['tutorial'] = request.GET.get('tutorial', None)
     context['minute_range'] = request.GET.get('minute_range', None)
-    context['second_range'] = request.GET.get('second_range', None)    
-    return render(request, 'website/templates/question_category.html',context)
+    context['second_range'] = request.GET.get('second_range', None)
+    return render(request, 'website/templates/question_category.html', context)
+
 
 def hidden_questions(request):
     questions = Question.objects.filter(status=0).order_by('date_created').reverse()
@@ -253,19 +254,20 @@ def new_question(request):
             resultspam = predictorspam(content)
             warning = ''
             if resultspam == 1:
-                warning = 'Our system detects you have entered a possibly spam content. Do you want admin to review the same?'
+                warning = 'Our system detects you have entered a possibly spam \
+                content. Do you want admin to review the same?'
                 context['help'] = warning
                 category = request.POST.get('category', None)
                 tutorial = request.POST.get('tutorial', None)
                 context['tut'] = tutorial
                 minute_range = request.POST.get('minute_range', None)
-                context['minute_range']=minute_range
+                context['minute_range'] = minute_range
                 second_range = request.POST.get('second_range', None)
-                context['second_range']=second_range
+                context['second_range'] = second_range
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
                 form = NewQuestionForm(category=category, tutorial=tutorial,
                                        minute_range=minute_range, second_range=second_range)
-                soup = BeautifulSoup(content,"lxml")
+                soup = BeautifulSoup(content, "lxml")
                 if soup.find_all('style'):
                     soup.style.decompose()
                 content = soup.get_text()
@@ -276,17 +278,18 @@ def new_question(request):
 
             resultpredictor = predictor(content)
             if resultpredictor == 1:
-                warning= 'Our system detects you have possibly entered a general question. Do you want to post it over there?'
+                warning = 'Our system detects you have possibly entered a general \
+                question. Do you want to post it over there?'
                 category = request.POST.get('category', None)
                 tutorial = "General"
                 minute_range = None
                 second_range = None
-                context['help']=warning
-                context['category']=category
+                context['help'] = warning
+                context['category'] = category
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
                 form = NewQuestionForm(category=category, tutorial=tutorial,
                                        minute_range=minute_range, second_range=second_range)
-                soup = BeautifulSoup(content,"lxml")
+                soup = BeautifulSoup(content, "lxml")
                 if soup.find_all('style'):
                     soup.style.decompose()
                 content = soup.get_text()
@@ -368,7 +371,8 @@ def new_question_general(request):
             resultspam = predictorspam(content)
             warning = ''
             if resultspam == 1:
-                warning = 'Our system detects you have entered a possibly spam content. Do you want admin to review the same?'
+                warning = 'Our system detects you have entered a possibly spam \
+                content. Do you want admin to review the same?'
                 context['help'] = warning
                 category = request.POST.get('category', None)
                 tutorial = request.POST.get('tutorial', None)
@@ -385,7 +389,7 @@ def new_question_general(request):
                 context['title'] = title
                 context['form'] = form
                 return render(request, 'website/templates/new-question-general.html', context)
-        
+
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
@@ -402,7 +406,7 @@ def new_question_general(request):
                 question.views = 1
                 question.save()
                 messages.success(request, "Your question has been sent for review. Check the site for further updates!")
-                return HttpResponseRedirect('/')            
+                return HttpResponseRedirect('/')
             question.views = 1
             question.save()
             '''

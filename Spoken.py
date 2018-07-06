@@ -3,7 +3,6 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
-import re
 from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import pickle
