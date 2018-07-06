@@ -381,7 +381,7 @@ def new_question_general(request):
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
                 form = NewQuestionForm(category=category, tutorial=tutorial,
                                        minute_range=minute_range, second_range=second_range)
-                soup = BeautifulSoup(content,"lxml")
+                soup = BeautifulSoup(content, "lxml")
                 if soup.find_all('style'):
                     soup.style.decompose()
                 content = soup.get_text()
