@@ -3,8 +3,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
-from nltk import word_tokenize
-from nltk.stem import WordNetLemmatizer
+# from nltk import word_tokenize
+# from nltk.stem import WordNetLemmatizer
 import pickle
 from imblearn.over_sampling import SMOTE
 fields = ['Content', 'Label']
@@ -30,17 +30,17 @@ df['Content'] = df['Content'].apply(remove_tags)
 
 # Lemmatizer
 
-
+'''
 class LemmaTokenizer(object):
     def __init__(self):
         self.wnl = WordNetLemmatizer()
 
     def __call__(self, doc):
         return [self.wnl.lemmatize(t) for t in word_tokenize(doc)]
-
+'''
 
 # Vectorizer
-vectorizer = TfidfVectorizer(stop_words='english', tokenizer=LemmaTokenizer())
+vectorizer = TfidfVectorizer(stop_words='english')
 
 x = vectorizer.fit_transform(df['Content'])
 

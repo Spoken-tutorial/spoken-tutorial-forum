@@ -216,6 +216,10 @@
 </div> <!-- /.row -->
 {% endfor %}
 
+{% for message in messages %}
+    <div class="alert alert-danger" style="color: white;font-size: 95%;font-family: sans serif;font-weight: 400;">{{ message }}</div>
+{% endfor %}
+
 {% if user.is_authenticated %}
     <form action="{% url 'website:question_answer' %}" method="POST"> {% csrf_token %}
         {% with WIDGET_ERROR_CLASS='field_error' %}

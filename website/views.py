@@ -1,7 +1,7 @@
 import json
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.core.context_processors import csrf
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -110,6 +110,13 @@ def question_answer(request):
             cleaned_data = form.cleaned_data
             qid = cleaned_data['question']
             body = cleaned_data['body']
+            res = predictorspam(body)
+            context = {}
+            if res == 1:
+                messages.success(request, "Our system detects that you are trying to enter a possibly\
+                 spam content. Please contact the site admin if you wish to publish the same.")
+                return HttpResponseRedirect(request.META['HTTP_REFERER'])
+
             question = get_object_or_404(Question, id=qid)
             answer = Answer()
             answer.uid = request.user.id
@@ -278,7 +285,7 @@ def new_question(request):
 
             resultpredictor = predictor(content)
             if resultpredictor == 1:
-                warning = 'Our system detects you have possibly entered a general \
+                warning = 'Our system detects you have possibly entered a training \
                 question. Do you want to post it over there?'
                 category = request.POST.get('category', None)
                 tutorial = "General"
@@ -313,6 +320,33 @@ def new_question(request):
                 question.status = 0
                 question.views = 1
                 question.save()
+                '''
+                # Sending email when a admin review is asked
+                subject = 'New Spam Question'
+                message = """
+                    The following question has been marked spam in the Spoken Tutorial\
+                     Forum. Kindly review the same: <br>
+                    Title: <b>{0}</b><br>
+                    Category: <b>{1}</b><br>
+                    Tutorial: <b>{2}</b><br>
+                    Link: <a href="{3}">{3}</a><br>
+                    Question: <b>{4}</b><br>
+                """.format(
+                    question.title,
+                    question.category,
+                    question.tutorial,
+                    'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                    question.body
+                )
+                email = EmailMultiAlternatives(
+                   subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                # End of email send
+                '''
                 messages.success(request, "Your question has been sent for review. Check the site for further updates!")
                 return HttpResponseRedirect('/')
             question.views = 1
@@ -405,6 +439,33 @@ def new_question_general(request):
                 question.status = 0
                 question.views = 1
                 question.save()
+                '''
+                # Sending email when a admin review is asked
+                subject = 'New Spam Question'
+                message = """
+                    The following question has been marked spam in the Spoken Tutorial\
+                     Forum. Kindly review the same: <br>
+                    Title: <b>{0}</b><br>
+                    Category: <b>{1}</b><br>
+                    Tutorial: <b>{2}</b><br>
+                    Link: <a href="{3}">{3}</a><br>
+                    Question: <b>{4}</b><br>
+                """.format(
+                    question.title,
+                    question.category,
+                    question.tutorial,
+                    'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                    question.body
+                )
+                email = EmailMultiAlternatives(
+                   subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                # End of email send
+                '''
                 messages.success(request, "Your question has been sent for review. Check the site for further updates!")
                 return HttpResponseRedirect('/')
             question.views = 1
