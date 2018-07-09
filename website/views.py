@@ -1,7 +1,7 @@
 import json
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404
 from django.core.context_processors import csrf
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -111,7 +111,6 @@ def question_answer(request):
             qid = cleaned_data['question']
             body = cleaned_data['body']
             res = predictorspam(body)
-            context = {}
             if res == 1:
                 messages.success(request, "Our system detects that you are trying to enter a possibly\
                  spam content. Please contact the site admin if you wish to publish the same.")
