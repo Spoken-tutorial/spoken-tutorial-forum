@@ -257,14 +257,20 @@ def new_question(request):
         if request.POST['action'] == 'Submit Question':
             content = request.POST['body']
             title = request.POST['title']
-            resultspam = predictorspam(content)
+            category = request.POST.get('category', None)
+            tutorial = request.POST.get('tutorial', None)
+            tutorial_detail_id = TutorialDetails.objects.filter(tutorial=tutorial).values('foss')
+            print "tutorial_detail_id",tutorial_detail_id[0]['foss']
+            resultspam = predictorspam(content,tutorial_detail_id[0]['foss'])
             warning = ''
-            if resultspam == 1:
+            print "resultspam",resultspam
+            if resultspam == 0:
                 warning = 'Our system detects you have entered a possibly spam \
                 content. Do you want admin to review the same?'
                 context['help'] = warning
-                category = request.POST.get('category', None)
-                tutorial = request.POST.get('tutorial', None)
+                
+                
+                
                 context['tut'] = tutorial
                 minute_range = request.POST.get('minute_range', None)
                 context['minute_range'] = minute_range
@@ -283,6 +289,7 @@ def new_question(request):
                 return render(request, 'website/templates/new-question.html', context)
 
             resultpredictor = predictor(content)
+            print "resultpredictor",resultpredictor
             if resultpredictor == 1:
                 warning = 'Our system detects you have possibly entered a training \
                 question. Do you want to post it over there?'
