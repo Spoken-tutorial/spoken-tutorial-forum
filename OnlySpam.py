@@ -37,6 +37,34 @@ from django.conf import settings
 
 def predictorspam(comment,tdid):
     clean_data = os_walk(tdid)
+    clean_data = clean_data.split(".")
+    my_dict = {}
+
+    for data in clean_data:
+        try:
+            my_dict["Content"].append(data)
+            my_dict["Spam"].append(2)
+        except:
+            my_dict["Content"] = [data]
+            my_dict["Spam"] = [2]
+            
+    # 0 - Spam
+    # 1 - Training related
+    # 2 - Tutorial related
+    new_df = pd.DataFrame(data=my_dict)
+    df = pd.read_csv('cuss.csv', usecols=fields, skipinitialspace=True)
+    frame = [new_df,df]
+    result_df = pd.concat(frame)
+
+    result_df['Content'] = result_df['Content'].apply(remove_tags)
+    vectorizer = TfidfVectorizer(stop_words='english')
+    x_train = vectorizer.fit_transform(result_df['Content'])
+    model = LinearSVC()
+
+    model.fit(x_train, result_df['Spam'])
+    filename = 'spam_model.sav'
+
+    pickle.dump(model, open(filename, 'wb'))
     simplified = remove_tags(comment)
     tester = [simplified]
     contest = vectorizer.transform(tester)
@@ -47,13 +75,14 @@ def predictorspam(comment,tdid):
     return a[0]
 import re
 import os
-def get_data(root,file):
+def get_script_data(root,file):
     data = ""
     with open(root+'/'+file) as docfile:
         print "\n==================="
         data += docfile.read()
         print "\n==================="
-        data_parsed = re.sub('[^A-Z a-z]+', '', data)
+
+        data_parsed = re.sub('[^A-Z a-z .]+', '', data)
         return data_parsed.lower()
 
 VIDEO_PATH = '/datas/websites/saurabh-a/spoken-website/media/videos/'
@@ -72,7 +101,7 @@ def os_walk(tdid):
             files = [ fi for fi in files if fi.endswith("English.srt") ]
             print "files found are : \n",files
             for file in files:
-                data += get_data(root,file)
+                data += get_script_data(root,file)
 
         return data
             
