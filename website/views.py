@@ -288,9 +288,7 @@ def new_question(request):
                 context['form'] = form
                 return render(request, 'website/templates/new-question.html', context)
 
-            resultpredictor = predictor(content)
-            print "resultpredictor",resultpredictor
-            if resultpredictor == 1:
+            if resultspam == 1:
                 warning = 'Our system detects you have possibly entered a training \
                 question. Do you want to post it over there?'
                 category = request.POST.get('category', None)
@@ -408,9 +406,13 @@ def new_question_general(request):
         if request.POST['action'] == 'Submit Question':
             content = request.POST['body']
             title = request.POST['title']
-            resultspam = predictorspam(content)
+            category = request.POST['category']
+            print "category :",category
+            tutorial_detail_id = TutorialDetails.objects.filter(foss__foss=category).values('foss')
+            print "tutorial_detail_id",tutorial_detail_id[0]['foss']
+            resultspam = predictorspam(content,tutorial_detail_id[0]['foss'])
             warning = ''
-            if resultspam == 1:
+            if resultspam == 0:
                 warning = 'Our system detects you have entered a possibly spam \
                 content. Do you want admin to review the same?'
                 context['help'] = warning

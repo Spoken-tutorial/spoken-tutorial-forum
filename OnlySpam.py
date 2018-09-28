@@ -37,7 +37,10 @@ from django.conf import settings
 
 def predictorspam(comment,tdid):
     clean_data = os_walk(tdid)
+
+    #clean_data = find_filesd(files=[],tdid,extensions=["English.srt"])
     clean_data = clean_data.split(".")
+    print "clean_data",clean_data
     my_dict = {}
 
     for data in clean_data:
@@ -52,6 +55,7 @@ def predictorspam(comment,tdid):
     # 1 - Training related
     # 2 - Tutorial related
     new_df = pd.DataFrame(data=my_dict)
+    print "\n\n",new_df,"\n\n"
     df = pd.read_csv('cuss.csv', usecols=fields, skipinitialspace=True)
     frame = [new_df,df]
     result_df = pd.concat(frame)
@@ -76,32 +80,25 @@ def predictorspam(comment,tdid):
 import re
 import os
 def get_script_data(root,file):
-    data = ""
     with open(root+'/'+file) as docfile:
         print "\n==================="
-        data += docfile.read()
+        data = docfile.read()
         print "\n==================="
 
         data_parsed = re.sub('[^A-Z a-z .]+', '', data)
+        print "data_parsed",type(data_parsed)
         return data_parsed.lower()
 
 VIDEO_PATH = '/datas/websites/saurabh-a/spoken-website/media/videos/'
 def os_walk(tdid):
     data = ""
     filepath = VIDEO_PATH + str(tdid) + '/'
-    print "filepath :",filepath
-    
-    for root, dirs, files in os.walk(filepath):
-        if not dirs:
-            print(root, "is a directory without subdirectories")
-            # do whatever you need to do with your files here
-        else:
-            print "root : ",root
-            print "dirs : ", dirs
-            files = [ fi for fi in files if fi.endswith("English.srt") ]
-            print "files found are : \n",files
-            for file in files:
-                data += get_script_data(root,file)
+    for root,dirs,files in os.walk(filepath):
+        if root[len(filepath)+1:].count(os.sep)<4:
+            for f in files:
+                
+                if f.endswith("English.srt"):
+                    print(os.path.join(root,f))
+                    data += get_script_data(root,f)
 
-        return data
-            
+    return data
