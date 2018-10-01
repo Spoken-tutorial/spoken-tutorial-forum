@@ -86,7 +86,6 @@ def get_script_data(root,file):
         print "\n==================="
 
         data_parsed = re.sub('[^A-Z a-z .]+', '', data)
-        print "data_parsed",type(data_parsed)
         return data_parsed.lower()
 
 VIDEO_PATH = '/datas/websites/saurabh-a/spoken-website/media/videos/'

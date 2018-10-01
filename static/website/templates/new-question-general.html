@@ -44,8 +44,13 @@
             <div class="form-group">
                 {% if help %}
                 <div class="alert" style="background-color: #7f8c8d;color: white;font-size: 95%;font-family: sans serif;font-weight: 400;">
-                    {{ help }} 
-                    <input class="btn btn-success" style="margin-left:20px;" type="submit" name="action" value="Send for review">
+                    {{ help }}
+                    {% if title %}
+                    <input class="btn btn-success" style="margin-left:20px;" type="submit" name="action" value="Yes">
+                    <a href="/"><button class="btn btn-danger" style="margin-left:20px;" type="button">No</button></a>
+                    {% elif title2 %}
+                    <input class="btn btn-success" style="margin-left:20px;" type="submit" name="action" value="Send for review">                    
+                    {% endif %}
                 </div>
                 {% endif %}
                 <label for="id_title">Title:</label>

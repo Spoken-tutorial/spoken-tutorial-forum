@@ -259,9 +259,16 @@ def new_question(request):
             title = request.POST['title']
             category = request.POST.get('category', None)
             tutorial = request.POST.get('tutorial', None)
-            tutorial_detail_id = TutorialDetails.objects.filter(foss__foss=category).values('foss')
-            print "tutorial_detail_id",tutorial_detail_id[0]['foss']
-            resultspam = predictorspam(content,tutorial_detail_id[0]['foss'])
+            
+            try:
+                tutorial_detail_id = TutorialDetails.objects.filter(tutorial=tutorial).values('foss','id')
+                path = str(tutorial_detail_id[0]['foss'])+'/'+str(tutorial_detail_id[0]['id'])
+
+            except:
+                tutorial_detail_id = TutorialDetails.objects.filter(foss__foss=category).values('foss')
+                path = tutorial_detail_id[0]['foss']
+            print "path :",path
+            resultspam = predictorspam(content,path)
             warning = ''
             print "resultspam",resultspam
             if resultspam == 0:
@@ -428,9 +435,30 @@ def new_question_general(request):
                     soup.style.decompose()
                 content = soup.get_text()
                 context['body'] = content.lstrip().rstrip()
+                context['title2'] = title
+                context['form'] = form
+                return render(request, 'website/templates/new-question-general.html', context)
+
+            if resultspam == 2:
+                warning = 'Our system detects you have entered a Tutorial \
+                related content. Do you still want to post it ?'
+                context['help'] = warning
+                category = request.POST.get('category', None)
+                tutorial = request.POST.get('tutorial', None)
+                minute_range = request.POST.get('minute_range', None)
+                second_range = request.POST.get('second_range', None)
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+                form = NewQuestionForm(category=category, tutorial=tutorial,
+                                       minute_range=minute_range, second_range=second_range)
+                soup = BeautifulSoup(content, "lxml")
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
                 context['title'] = title
                 context['form'] = form
                 return render(request, 'website/templates/new-question-general.html', context)
+
 
         form = NewQuestionForm(request.POST)
         if form.is_valid():
