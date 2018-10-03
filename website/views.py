@@ -277,8 +277,9 @@ def new_question(request):
 
             if resultspam == 0:
                 warning = \
-                    'Our system detects you have entered a possibly spam \
-                content. Do you want admin to review the same?'
+                    'Our system detects you have entered a text \
+                that is not related to the tutorials directly or is not very clear .\
+                Do you want admin to review the same?'
                 context['help'] = warning
 
                 context['tut'] = tutorial
@@ -395,8 +396,9 @@ def new_question_general(request):
             warning = ''
             if resultspam == 0:
                 warning = \
-                    'Our system detects you have entered a possibly spam \
-                content. Do you want admin to review the same?'
+                        'Our system detects you have entered a text \
+                that is not related to the tutorials directly or is not very clear .\
+                Do you want admin to review the same?'
                 context['help'] = warning
                 category = request.POST.get('category', None)
                 tutorial = request.POST.get('tutorial', None)
