@@ -104,14 +104,15 @@ def get_question(request, question_id=None, pretty_url=None):
 
 @login_required
 def question_answer(request):
+    
     if request.method == 'POST':
         form = AnswerQuesitionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
             qid = cleaned_data['question']
             body = cleaned_data['body']
-            res = predictorspam(body)
-            if res == 1:
+            res = predictorspam(body, False)
+            if res == 0:
                 messages.success(request, "Our system detects that you are trying to enter a possibly\
                  spam content. Please contact the site admin if you wish to publish the same.")
                 return HttpResponseRedirect(request.META['HTTP_REFERER'])
@@ -274,7 +275,6 @@ def new_question(request):
                 path = tutorial_detail_id[0]['foss']
             resultspam = predictorspam(content, path)
             warning = ''
-
             if resultspam == 0:
                 warning = \
                     'Our system detects you have entered a text \
@@ -332,19 +332,17 @@ def new_question(request):
                               context)
 
         form = NewQuestionForm(request.POST)
-        if form.is_valid():
-            cleaned_data = form.cleaned_data
+        if request.method == 'POST':
             question = Question()
             question.uid = request.user.id
-            question.category = cleaned_data['category'].replace(' ',
-                    '-')
-            question.tutorial = cleaned_data['tutorial'].replace(' ',
-                    '-')
-            question.minute_range = cleaned_data['minute_range']
-            question.second_range = cleaned_data['second_range']
-            question.title = cleaned_data['title']
-            question.body = cleaned_data['body'].encode('unicode_escape'
-                    )
+            question.category = form['category'].value().replace(' ','-')
+            question.tutorial = form['tutorial'].value().replace(' ','-')
+            minute_range = 'None'
+            second_range = 'None'
+            question.minute_range = minute_range
+            question.second_range = second_range
+            question.title = form['title'].value()
+            question.body = form['body'].value().encode('unicode_escape')
             if request.POST['action'] == 'Send for review':
                 question.status = 0
                 question.views = 1
@@ -354,7 +352,6 @@ def new_question(request):
                                  )
                 return HttpResponseRedirect('/')
             question.views = 1
-
             question.save()
             return HttpResponseRedirect('/')
     else:

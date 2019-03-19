@@ -2,6 +2,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
+from forums.config import VIDEO_PATH
 import pickle
 import re
 import os
@@ -41,19 +42,17 @@ from django.conf import settings
 
 
 def predictorspam(comment, tdid):
-    clean_data = os_walk(tdid)
-
-    clean_data = clean_data.split('.')
-
-    my_dict = {}
-
-    for data in clean_data:
-        try:
-            my_dict['Content'].append(data)
-            my_dict['Spam'].append(2)
-        except:
-            my_dict['Content'] = [data]
-            my_dict['Spam'] = [2]
+    if tdid:
+        clean_data = os_walk(tdid)
+        clean_data = clean_data.split('.')
+        my_dict = {}
+        for data in clean_data:
+            try:
+                my_dict['Content'].append(data)
+                my_dict['Spam'].append(2)
+            except:
+                my_dict['Content'] = [data]
+                my_dict['Spam'] = [2]
 
     # 0 - Spam
     # 1 - Training related
@@ -89,10 +88,6 @@ def get_script_data(root, file):
 
         data_parsed = re.sub('[^A-Z a-z .]+', '', data)
         return data_parsed.lower()
-
-
-VIDEO_PATH = '/datas/websites/saurabh-a/spoken-website/media/videos/'
-
 
 def os_walk(tdid):
     data = ''
