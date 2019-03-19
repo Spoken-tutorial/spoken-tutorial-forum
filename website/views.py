@@ -15,10 +15,8 @@ from website.forms import NewQuestionForm, AnswerQuesitionForm
 from website.helpers import get_video_info, prettify
 from forums.config import VIDEO_PATH
 from website.templatetags.permission_tags import can_edit
-from spoken_auth.models import FossCategory
 
 # For spam classifier
-#from Spoken import predictor
 from OnlySpam import predictorspam
 from bs4 import BeautifulSoup
 from django.contrib import messages
@@ -87,7 +85,6 @@ def hidden_questions(request):
 def get_question(request, question_id=None, pretty_url=None):
     question = get_object_or_404(Question, id=question_id)
     pretty_title = prettify(question.title)
-    category = FossCategory.objects.all().order_by('foss')
     if pretty_url != pretty_title:
         return HttpResponseRedirect('/question/' + question_id + '/' + pretty_title)
     answers = question.answer_set.all()
@@ -95,7 +92,6 @@ def get_question(request, question_id=None, pretty_url=None):
     context = {
         'question': question,
         'answers': answers,
-        'category': category,
         'form': form
     }
     context.update(csrf(request))
@@ -107,7 +103,7 @@ def get_question(request, question_id=None, pretty_url=None):
 
 @login_required
 def question_answer(request):
-    
+
     if request.method == 'POST':
         form = AnswerQuesitionForm(request.POST)
         if form.is_valid():
@@ -266,15 +262,14 @@ def new_question(request):
 
             try:
                 tutorial_detail_id = \
-                    TutorialDetails.objects.filter(tutorial=tutorial).values('foss'
-                        , 'id')
+                    TutorialDetails.objects.filter(tutorial=tutorial).values('foss', 'id')
                 path = str(tutorial_detail_id[0]['foss']) + '/' \
                     + str(tutorial_detail_id[0]['id'])
-            except:
+            except BaseException:
 
                 tutorial_detail_id = \
                     TutorialDetails.objects.filter(foss__foss=category).values('foss'
-                        )
+                                                                               )
                 path = tutorial_detail_id[0]['foss']
             resultspam = predictorspam(content, path)
             warning = ''
@@ -294,8 +289,8 @@ def new_question(request):
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
 
                 form = NewQuestionForm(category=category,
-                        tutorial=tutorial, minute_range=minute_range,
-                        second_range=second_range)
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
                 soup = BeautifulSoup(content, 'lxml')
                 if soup.find_all('style'):
                     soup.style.decompose()
@@ -321,8 +316,8 @@ def new_question(request):
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
 
                 form = NewQuestionForm(category=category,
-                        tutorial=tutorial, minute_range=minute_range,
-                        second_range=second_range)
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
                 soup = BeautifulSoup(content, 'lxml')
                 if soup.find_all('style'):
                     soup.style.decompose()
@@ -338,8 +333,8 @@ def new_question(request):
         if request.method == 'POST':
             question = Question()
             question.uid = request.user.id
-            question.category = form['category'].value().replace(' ','-')
-            question.tutorial = form['tutorial'].value().replace(' ','-')
+            question.category = form['category'].value().replace(' ', '-')
+            question.tutorial = form['tutorial'].value().replace(' ', '-')
             minute_range = 'None'
             second_range = 'None'
             question.minute_range = minute_range
@@ -378,6 +373,7 @@ def new_question(request):
     return render(request, 'website/templates/new-question.html',
                   context)
 
+
 @login_required
 def new_question_general(request):
     context = {}
@@ -389,14 +385,14 @@ def new_question_general(request):
 
             tutorial_detail_id = \
                 TutorialDetails.objects.filter(foss__foss=category).values('foss'
-                    )
+                                                                           )
 
             resultspam = predictorspam(content,
-                    tutorial_detail_id[0]['foss'])
+                                       tutorial_detail_id[0]['foss'])
             warning = ''
             if resultspam == 0:
                 warning = \
-                        'Our system detects you have entered a text \
+                    'Our system detects you have entered a text \
                 that is not related to the tutorials directly or is not very clear .\
                 Do you want admin to review the same?'
                 context['help'] = warning
@@ -408,8 +404,8 @@ def new_question_general(request):
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
 
                 form = NewQuestionForm(category=category,
-                        tutorial=tutorial, minute_range=minute_range,
-                        second_range=second_range)
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
                 soup = BeautifulSoup(content, 'lxml')
                 if soup.find_all('style'):
                     soup.style.decompose()
@@ -418,8 +414,7 @@ def new_question_general(request):
                 context['title2'] = title
                 context['form'] = form
                 return render(request,
-                              'website/templates/new-question-general.html'
-                              , context)
+                              'website/templates/new-question-general.html', context)
 
             if resultspam == 2:
                 warning = \
@@ -434,8 +429,8 @@ def new_question_general(request):
                 # pass minute_range and second_range value to NewQuestionForm to populate on select
 
                 form = NewQuestionForm(category=category,
-                        tutorial=tutorial, minute_range=minute_range,
-                        second_range=second_range)
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
                 soup = BeautifulSoup(content, 'lxml')
                 if soup.find_all('style'):
                     soup.style.decompose()
@@ -444,8 +439,7 @@ def new_question_general(request):
                 context['title'] = title
                 context['form'] = form
                 return render(request,
-                              'website/templates/new-question-general.html'
-                              , context)
+                              'website/templates/new-question-general.html', context)
 
         form = NewQuestionForm(request.POST)
         if form.is_valid():
@@ -453,14 +447,14 @@ def new_question_general(request):
             question = Question()
             question.uid = request.user.id
             question.category = cleaned_data['category'].replace(' ',
-                    '-')
+                                                                 '-')
             question.tutorial = cleaned_data['tutorial'].replace(' ',
-                    '-')
+                                                                 '-')
             question.minute_range = cleaned_data['minute_range']
             question.second_range = cleaned_data['second_range']
             question.title = cleaned_data['title']
             question.body = cleaned_data['body'].encode('unicode_escape'
-                    )
+                                                        )
             if request.POST['action'] == 'Send for review':
                 question.status = 0
                 question.views = 1
@@ -489,8 +483,7 @@ def new_question_general(request):
         context['category'] = category
     context['form'] = form
     context.update(csrf(request))
-    return render(request, 'website/templates/new-question-general.html'
-                  , context)
+    return render(request, 'website/templates/new-question-general.html', context)
 
 # Notification Section
 
@@ -636,9 +629,7 @@ def ajax_details_update(request):
     if request.method == 'POST':
         qid = request.POST['qid']
         category = request.POST['category']
-        category = category.replace(' ', '-')
         tutorial = request.POST['tutorial']
-        tutorial = tutorial.replace(' ', '-')
         minute_range = request.POST['minute_range']
         second_range = request.POST['second_range']
         question = get_object_or_404(Question, pk=qid)

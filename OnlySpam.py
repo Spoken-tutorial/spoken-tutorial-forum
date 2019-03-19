@@ -1,3 +1,4 @@
+from django.conf import settings
 import pandas as pd
 from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -20,8 +21,7 @@ def remove_tags(text):
     if soup.find_all('style'):
         soup.style.decompose()
     string = soup.get_text()
-    string = string.replace('&nbsp;', '').replace('\n', '').replace('\r'
-            , '').replace('\t', '')
+    string = string.replace('&nbsp;', '').replace('\n', '').replace('\r', '').replace('\t', '')
     string = ' '.join([w for w in string.split() if len(w) >= 3])
     return string
 
@@ -38,7 +38,6 @@ model.fit(x_train, df['Spam'])
 filename = 'spam_model.sav'
 
 pickle.dump(model, open(filename, 'wb'))
-from django.conf import settings
 
 
 def predictorspam(comment, tdid):
@@ -50,7 +49,7 @@ def predictorspam(comment, tdid):
             try:
                 my_dict['Content'].append(data)
                 my_dict['Spam'].append(2)
-            except:
+            except BaseException:
                 my_dict['Content'] = [data]
                 my_dict['Spam'] = [2]
 
@@ -88,6 +87,7 @@ def get_script_data(root, file):
 
         data_parsed = re.sub('[^A-Z a-z .]+', '', data)
         return data_parsed.lower()
+
 
 def os_walk(tdid):
     data = ''
