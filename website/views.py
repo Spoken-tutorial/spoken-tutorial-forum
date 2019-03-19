@@ -15,7 +15,11 @@ from website.forms import NewQuestionForm, AnswerQuesitionForm
 from website.helpers import get_video_info, prettify
 from forums.config import VIDEO_PATH
 from website.templatetags.permission_tags import can_edit
-from spoken_auth.models import FossCategory
+
+# For spam classifier
+from OnlySpam import predictorspam
+from bs4 import BeautifulSoup
+from django.contrib import messages
 
 User = get_user_model()
 categories = []
@@ -52,6 +56,15 @@ def questions(request):
     return render(request, 'website/templates/questions.html', context)
 
 
+def question_category(request):
+    context = {}
+    context['category'] = request.GET.get('category', None)
+    context['tutorial'] = request.GET.get('tutorial', None)
+    context['minute_range'] = request.GET.get('minute_range', None)
+    context['second_range'] = request.GET.get('second_range', None)
+    return render(request, 'website/templates/question_category.html', context)
+
+
 def hidden_questions(request):
     questions = Question.objects.filter(status=0).order_by('date_created').reverse()
     paginator = Paginator(questions, 20)
@@ -72,7 +85,6 @@ def hidden_questions(request):
 def get_question(request, question_id=None, pretty_url=None):
     question = get_object_or_404(Question, id=question_id)
     pretty_title = prettify(question.title)
-    category = FossCategory.objects.all().order_by('foss')
     if pretty_url != pretty_title:
         return HttpResponseRedirect('/question/' + question_id + '/' + pretty_title)
     answers = question.answer_set.all()
@@ -80,7 +92,6 @@ def get_question(request, question_id=None, pretty_url=None):
     context = {
         'question': question,
         'answers': answers,
-        'category': category,
         'form': form
     }
     context.update(csrf(request))
@@ -92,12 +103,19 @@ def get_question(request, question_id=None, pretty_url=None):
 
 @login_required
 def question_answer(request):
+
     if request.method == 'POST':
         form = AnswerQuesitionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
             qid = cleaned_data['question']
             body = cleaned_data['body']
+            res = predictorspam(body, False)
+            if res == 0:
+                messages.success(request, "Our system detects that you are trying to enter a possibly\
+                 spam content. Please contact the site admin if you wish to publish the same.")
+                return HttpResponseRedirect(request.META['HTTP_REFERER'])
+
             question = get_object_or_404(Question, id=qid)
             answer = Answer()
             answer.uid = request.user.id
@@ -236,60 +254,236 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 def new_question(request):
     context = {}
     if request.method == 'POST':
+        if request.POST['action'] == 'Submit Question':
+            content = request.POST['body']
+            title = request.POST['title']
+            category = request.POST.get('category', None)
+            tutorial = request.POST.get('tutorial', None)
+
+            try:
+                tutorial_detail_id = \
+                    TutorialDetails.objects.filter(tutorial=tutorial).values('foss', 'id')
+                path = str(tutorial_detail_id[0]['foss']) + '/' \
+                    + str(tutorial_detail_id[0]['id'])
+            except BaseException:
+
+                tutorial_detail_id = \
+                    TutorialDetails.objects.filter(foss__foss=category).values('foss'
+                                                                               )
+                path = tutorial_detail_id[0]['foss']
+            resultspam = predictorspam(content, path)
+            warning = ''
+            if resultspam == 0:
+                warning = \
+                    'Our system detects you have entered a text \
+                that is not related to the tutorials directly or is not very clear .\
+                Do you want admin to review the same?'
+                context['help'] = warning
+
+                context['tut'] = tutorial
+                minute_range = request.POST.get('minute_range', None)
+                context['minute_range'] = minute_range
+                second_range = request.POST.get('second_range', None)
+                context['second_range'] = second_range
+
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+
+                form = NewQuestionForm(category=category,
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
+                soup = BeautifulSoup(content, 'lxml')
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title2'] = title
+                context['form'] = form
+                return render(request,
+                              'website/templates/new-question.html',
+                              context)
+
+            if resultspam == 1:
+                warning = \
+                    'Our system detects you have possibly entered a training \
+                question. Do you want to post it over there?'
+                category = request.POST.get('category', None)
+                tutorial = 'General'
+                minute_range = None
+                second_range = None
+                context['help'] = warning
+                context['category'] = category
+
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+
+                form = NewQuestionForm(category=category,
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
+                soup = BeautifulSoup(content, 'lxml')
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title'] = title
+                context['form'] = form
+                return render(request,
+                              'website/templates/new-question.html',
+                              context)
+
+        form = NewQuestionForm(request.POST)
+        if request.method == 'POST':
+            question = Question()
+            question.uid = request.user.id
+            question.category = form['category'].value().replace(' ', '-')
+            question.tutorial = form['tutorial'].value().replace(' ', '-')
+            minute_range = 'None'
+            second_range = 'None'
+            question.minute_range = minute_range
+            question.second_range = second_range
+            question.title = form['title'].value()
+            question.body = form['body'].value().encode('unicode_escape')
+            if request.POST['action'] == 'Send for review':
+                question.status = 0
+                question.views = 1
+                question.save()
+                messages.success(request,
+                                 'Your question has been sent for review. Check the site for further updates!'
+                                 )
+                return HttpResponseRedirect('/')
+            question.views = 1
+            question.save()
+            return HttpResponseRedirect('/')
+    else:
+
+        # get values from URL.
+
+        category = request.GET.get('category', None)
+        tutorial = request.GET.get('tutorial', None)
+        minute_range = request.GET.get('minute_range', None)
+        second_range = request.GET.get('second_range', None)
+
+        # pass minute_range and second_range value to NewQuestionForm to populate on select
+
+        form = NewQuestionForm(category=category, tutorial=tutorial,
+                               minute_range=minute_range,
+                               second_range=second_range)
+        context['category'] = category
+
+    context['form'] = form
+    context.update(csrf(request))
+    return render(request, 'website/templates/new-question.html',
+                  context)
+
+
+@login_required
+def new_question_general(request):
+    context = {}
+    if request.method == 'POST':
+        if request.POST['action'] == 'Submit Question':
+            content = request.POST['body']
+            title = request.POST['title']
+            category = request.POST['category']
+
+            tutorial_detail_id = \
+                TutorialDetails.objects.filter(foss__foss=category).values('foss'
+                                                                           )
+
+            resultspam = predictorspam(content,
+                                       tutorial_detail_id[0]['foss'])
+            warning = ''
+            if resultspam == 0:
+                warning = \
+                    'Our system detects you have entered a text \
+                that is not related to the tutorials directly or is not very clear .\
+                Do you want admin to review the same?'
+                context['help'] = warning
+                category = request.POST.get('category', None)
+                tutorial = request.POST.get('tutorial', None)
+                minute_range = request.POST.get('minute_range', None)
+                second_range = request.POST.get('second_range', None)
+
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+
+                form = NewQuestionForm(category=category,
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
+                soup = BeautifulSoup(content, 'lxml')
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title2'] = title
+                context['form'] = form
+                return render(request,
+                              'website/templates/new-question-general.html', context)
+
+            if resultspam == 2:
+                warning = \
+                    'Our system detects you have entered a Tutorial \
+                related content. Do you still want to post it ?'
+                context['help'] = warning
+                category = request.POST.get('category', None)
+                tutorial = request.POST.get('tutorial', None)
+                minute_range = request.POST.get('minute_range', None)
+                second_range = request.POST.get('second_range', None)
+
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+
+                form = NewQuestionForm(category=category,
+                                       tutorial=tutorial, minute_range=minute_range,
+                                       second_range=second_range)
+                soup = BeautifulSoup(content, 'lxml')
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title'] = title
+                context['form'] = form
+                return render(request,
+                              'website/templates/new-question-general.html', context)
+
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
             question = Question()
             question.uid = request.user.id
-            question.category = cleaned_data['category'].replace(' ', '-')
-            question.tutorial = cleaned_data['tutorial'].replace(' ', '-')
+            question.category = cleaned_data['category'].replace(' ',
+                                                                 '-')
+            question.tutorial = cleaned_data['tutorial'].replace(' ',
+                                                                 '-')
             question.minute_range = cleaned_data['minute_range']
             question.second_range = cleaned_data['second_range']
             question.title = cleaned_data['title']
-            question.body = cleaned_data['body'].encode('unicode_escape')
+            question.body = cleaned_data['body'].encode('unicode_escape'
+                                                        )
+            if request.POST['action'] == 'Send for review':
+                question.status = 0
+                question.views = 1
+                question.save()
+                messages.success(request,
+                                 'Your question has been sent for review. Check the site for further updates!'
+                                 )
+                return HttpResponseRedirect('/')
             question.views = 1
             question.save()
-
-            # Sending email when a new question is asked
-            subject = 'New Forum Question'
-            message = """
-                The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{0}</b><br>
-                Category: <b>{1}</b><br>
-                Tutorial: <b>{2}</b><br>
-                Link: <a href="{3}">{3}</a><br>
-                Question: <b>{4}</b><br>
-            """.format(
-                question.title,
-                question.category,
-                question.tutorial,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id),
-                question.body
-            )
-            email = EmailMultiAlternatives(
-                subject, '', 'forums',
-                ['team@spoken-tutorial.org', 'team@fossee.in'],
-                headers={"Content-type": "text/html;charset=iso-8859-1"}
-            )
-            email.attach_alternative(message, "text/html")
-            email.send(fail_silently=True)
-            # End of email send
-
             return HttpResponseRedirect('/')
     else:
+
         # get values from URL.
+
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
         second_range = request.GET.get('second_range', None)
-        # pass minute_range and second_range value to NewQuestionForm to populate on select
-        form = NewQuestionForm(category=category, tutorial=tutorial,
-                               minute_range=minute_range, second_range=second_range)
-        context['category'] = category
 
+        # pass minute_range and second_range value to NewQuestionForm to populate on select
+
+        form = NewQuestionForm(category=category, tutorial=tutorial,
+                               minute_range=minute_range,
+                               second_range=second_range)
+        context['category'] = category
     context['form'] = form
     context.update(csrf(request))
-    return render(request, 'website/templates/new-question.html', context)
+    return render(request, 'website/templates/new-question-general.html', context)
 
 # Notification Section
 
@@ -435,9 +629,7 @@ def ajax_details_update(request):
     if request.method == 'POST':
         qid = request.POST['qid']
         category = request.POST['category']
-        category = category.replace(' ', '-')
         tutorial = request.POST['tutorial']
-        tutorial = tutorial.replace(' ', '-')
         minute_range = request.POST['minute_range']
         second_range = request.POST['second_range']
         question = get_object_or_404(Question, pk=qid)
