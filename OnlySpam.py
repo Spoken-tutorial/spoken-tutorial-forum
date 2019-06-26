@@ -35,8 +35,8 @@ filename = 'spam_model.sav'
 pickle.dump(model, open(filename, 'wb'))
 from django.conf import settings
 
-def predictorspam(comment,tdid):
-    clean_data = os_walk(tdid)
+def predictorspam(comment, foss_id, tdid):
+    clean_data = os_walk(foss_id, tdid)
     clean_data = clean_data.split(".")
     my_dict = {}
 
@@ -85,10 +85,11 @@ def get_script_data(root,file):
         data_parsed = re.sub('[^A-Z a-z .]+', '', data)
         return data_parsed.lower()
 
-VIDEO_PATH = '/datas/websites/saurabh-a/spoken-website/media/videos/'
-def os_walk(tdid):
+#VIDEO_PATH = '/datas/websites/saurabh-a/spoken-website/media/videos/'
+from config import VIDEO_PATH
+def os_walk(foss_id, tdid):
     data = ""
-    filepath = VIDEO_PATH + str(tdid) + '/'
+    filepath = VIDEO_PATH +'/' +str(foss_id) + '/'
     print "filepath :",filepath
     
     for root, dirs, files in os.walk(filepath):
@@ -98,10 +99,17 @@ def os_walk(tdid):
         else:
             print "root : ",root
             print "dirs : ", dirs
-            files = [ fi for fi in files if fi.endswith("English.srt") ]
-            print "files found are : \n",files
-            for file in files:
-                data += get_script_data(root,file)
+            #files = [ fi for fi in files if fi.endswith("English.srt") ]
+            for folder in dirs:
+                print("{0} - {1}".format(type(folder),type(tdid)))
+                if folder == str(tdid):
+                    sub_filepath = filepath + folder + '/'
+                    for sub_root, sub_dirs, sub_files in os.walk(sub_filepath):
+                        if sub_dirs:
+                            files = [ fi for fi in sub_files if fi.endswith("English.srt") ]
+                            print "--",files
+                            for file in files:
+                                data += get_script_data(sub_root,file)
 
         return data
             

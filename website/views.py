@@ -259,9 +259,9 @@ def new_question(request):
             title = request.POST['title']
             category = request.POST.get('category', None)
             tutorial = request.POST.get('tutorial', None)
-            tutorial_detail_id = TutorialDetails.objects.filter(foss__foss=category).values('foss')
-            print "tutorial_detail_id",tutorial_detail_id[0]['foss']
-            resultspam = predictorspam(content,tutorial_detail_id[0]['foss'])
+            td = TutorialDetails.objects.filter(tutorial= tutorial, foss__foss=category).values('id','foss')
+            print "tutorial_detail_id",td
+            resultspam = predictorspam(content,td[0]['foss'],td[0]['id'])
             warning = ''
             print "resultspam",resultspam
             if resultspam == 0:
