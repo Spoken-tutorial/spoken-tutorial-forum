@@ -20,6 +20,12 @@ from sortable import SortableHeader, get_sorted_list, get_field_index
 from django.db.models import Count
 
 
+# For spam classifier
+from Spoken import predictor
+from OnlySpam import predictorspam
+from bs4 import BeautifulSoup
+from django.contrib import messages
+
 User = get_user_model()
 categories = []
 trs = TutorialResources.objects.filter(Q(status=1) | Q(status=2), language__name='English')
@@ -74,6 +80,15 @@ def questions(request):
     return render(request, 'website/templates/questions.html', context)
 
 
+def question_category(request):
+    context = {}
+    context['category'] = request.GET.get('category', None)
+    context['tutorial'] = request.GET.get('tutorial', None)
+    context['minute_range'] = request.GET.get('minute_range', None)
+    context['second_range'] = request.GET.get('second_range', None)
+    return render(request, 'website/templates/question_category.html', context)
+
+
 def hidden_questions(request):
     questions = Question.objects.filter(status=0).order_by('date_created').reverse()
     paginator = Paginator(questions, 20)
@@ -120,6 +135,12 @@ def question_answer(request):
             cleaned_data = form.cleaned_data
             qid = cleaned_data['question']
             body = cleaned_data['body']
+            res = predictorspam(body)
+            if res == 1:
+                messages.success(request, "Our system detects that you are trying to enter a possibly\
+                 spam content. Please contact the site admin if you wish to publish the same.")
+                return HttpResponseRedirect(request.META['HTTP_REFERER'])
+
             question = get_object_or_404(Question, id=qid)
             answer = Answer()
             answer.uid = request.user.id
@@ -258,6 +279,63 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 def new_question(request):
     context = {}
     if request.method == 'POST':
+        if request.POST['action'] == 'Submit Question':
+            content = request.POST['body']
+            title = request.POST['title']
+            category = request.POST.get('category', None)
+            tutorial = request.POST.get('tutorial', None)
+            td = TutorialDetails.objects.filter(tutorial= tutorial, foss__foss=category).values('id','foss')
+            print "tutorial_detail_id",td
+            resultspam = predictorspam(content,td[0]['foss'],td[0]['id'])
+            warning = ''
+            print "resultspam",resultspam
+            if resultspam == 0:
+                warning = 'Our system detects you have entered a possibly spam \
+                content. Do you want admin to review the same?'
+                context['help'] = warning
+                
+                
+                
+                context['tut'] = tutorial
+                minute_range = request.POST.get('minute_range', None)
+                context['minute_range'] = minute_range
+                second_range = request.POST.get('second_range', None)
+                context['second_range'] = second_range
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+                form = NewQuestionForm(category=category, tutorial=tutorial,
+                                       minute_range=minute_range, second_range=second_range)
+                soup = BeautifulSoup(content, "lxml")
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title2'] = title
+                context['form'] = form
+                return render(request, 'website/templates/new-question.html', context)
+
+            resultpredictor = predictor(content)
+            print "resultpredictor",resultpredictor
+            if resultpredictor == 1:
+                warning = 'Our system detects you have possibly entered a training \
+                question. Do you want to post it over there?'
+                category = request.POST.get('category', None)
+                tutorial = "General"
+                minute_range = None
+                second_range = None
+                context['help'] = warning
+                context['category'] = category
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+                form = NewQuestionForm(category=category, tutorial=tutorial,
+                                       minute_range=minute_range, second_range=second_range)
+                soup = BeautifulSoup(content, "lxml")
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title'] = title
+                context['form'] = form
+                return render(request, 'website/templates/new-question.html', context)
+
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
@@ -269,9 +347,43 @@ def new_question(request):
             question.second_range = cleaned_data['second_range']
             question.title = cleaned_data['title']
             question.body = cleaned_data['body'].encode('unicode_escape')
+            if request.POST['action'] == 'Send for review':
+                question.status = 0
+                question.views = 1
+                question.save()
+                '''
+                # Sending email when a admin review is asked
+                subject = 'New Spam Question'
+                message = """
+                    The following question has been marked spam in the Spoken Tutorial\
+                     Forum. Kindly review the same: <br>
+                    Title: <b>{0}</b><br>
+                    Category: <b>{1}</b><br>
+                    Tutorial: <b>{2}</b><br>
+                    Link: <a href="{3}">{3}</a><br>
+                    Question: <b>{4}</b><br>
+                """.format(
+                    question.title,
+                    question.category,
+                    question.tutorial,
+                    'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                    question.body
+                )
+                email = EmailMultiAlternatives(
+                   subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                # End of email send
+                '''
+                messages.success(request, "Your question has been sent for review. Check the site for further updates!")
+                return HttpResponseRedirect('/')
             question.views = 1
-            question.save()
 
+            question.save()
+            '''
             # Sending email when a new question is asked
             subject = 'New Forum Question'
             message = """
@@ -289,14 +401,14 @@ def new_question(request):
                 question.body
             )
             email = EmailMultiAlternatives(
-                subject, '', 'forums',
+               subject, '', 'forums',
                 ['team@spoken-tutorial.org', 'team@fossee.in'],
                 headers={"Content-type": "text/html;charset=iso-8859-1"}
             )
             email.attach_alternative(message, "text/html")
             email.send(fail_silently=True)
             # End of email send
-
+            '''
             return HttpResponseRedirect('/')
     else:
         # get values from URL.
@@ -312,6 +424,123 @@ def new_question(request):
     context['form'] = form
     context.update(csrf(request))
     return render(request, 'website/templates/new-question.html', context)
+
+
+@login_required
+def new_question_general(request):
+    context = {}
+    if request.method == 'POST':
+        if request.POST['action'] == 'Submit Question':
+            content = request.POST['body']
+            title = request.POST['title']
+            resultspam = predictorspam(content)
+            warning = ''
+            if resultspam == 1:
+                warning = 'Our system detects you have entered a possibly spam \
+                content. Do you want admin to review the same?'
+                context['help'] = warning
+                category = request.POST.get('category', None)
+                tutorial = request.POST.get('tutorial', None)
+                minute_range = request.POST.get('minute_range', None)
+                second_range = request.POST.get('second_range', None)
+                # pass minute_range and second_range value to NewQuestionForm to populate on select
+                form = NewQuestionForm(category=category, tutorial=tutorial,
+                                       minute_range=minute_range, second_range=second_range)
+                soup = BeautifulSoup(content, "lxml")
+                if soup.find_all('style'):
+                    soup.style.decompose()
+                content = soup.get_text()
+                context['body'] = content.lstrip().rstrip()
+                context['title'] = title
+                context['form'] = form
+                return render(request, 'website/templates/new-question-general.html', context)
+
+        form = NewQuestionForm(request.POST)
+        if form.is_valid():
+            cleaned_data = form.cleaned_data
+            question = Question()
+            question.uid = request.user.id
+            question.category = cleaned_data['category'].replace(' ', '-')
+            question.tutorial = cleaned_data['tutorial'].replace(' ', '-')
+            question.minute_range = cleaned_data['minute_range']
+            question.second_range = cleaned_data['second_range']
+            question.title = cleaned_data['title']
+            question.body = cleaned_data['body'].encode('unicode_escape')
+            if request.POST['action'] == 'Send for review':
+                question.status = 0
+                question.views = 1
+                question.save()
+                '''
+                # Sending email when a admin review is asked
+                subject = 'New Spam Question'
+                message = """
+                    The following question has been marked spam in the Spoken Tutorial\
+                     Forum. Kindly review the same: <br>
+                    Title: <b>{0}</b><br>
+                    Category: <b>{1}</b><br>
+                    Tutorial: <b>{2}</b><br>
+                    Link: <a href="{3}">{3}</a><br>
+                    Question: <b>{4}</b><br>
+                """.format(
+                    question.title,
+                    question.category,
+                    question.tutorial,
+                    'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                    question.body
+                )
+                email = EmailMultiAlternatives(
+                   subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                # End of email send
+                '''
+                messages.success(request, "Your question has been sent for review. Check the site for further updates!")
+                return HttpResponseRedirect('/')
+            question.views = 1
+            question.save()
+            '''
+            # Sending email when a new question is asked
+            subject = 'New Forum Question'
+            message = """
+                The following new question has been posted in the Spoken Tutorial Forum: <br>
+                Title: <b>{0}</b><br>
+                Category: <b>{1}</b><br>
+                Tutorial: <b>{2}</b><br>
+                Link: <a href="{3}">{3}</a><br>
+                Question: <b>{4}</b><br>
+            """.format(
+                question.title,
+                question.category,
+                question.tutorial,
+                'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                question.body
+            )
+            email = EmailMultiAlternatives(
+               subject, '', 'forums',
+                ['team@spoken-tutorial.org', 'team@fossee.in'],
+                headers={"Content-type": "text/html;charset=iso-8859-1"}
+            )
+            email.attach_alternative(message, "text/html")
+            email.send(fail_silently=True)
+            # End of email send
+            '''
+            return HttpResponseRedirect('/')
+    else:
+        # get values from URL.
+        category = request.GET.get('category', None)
+        tutorial = request.GET.get('tutorial', None)
+        minute_range = request.GET.get('minute_range', None)
+        second_range = request.GET.get('second_range', None)
+        # pass minute_range and second_range value to NewQuestionForm to populate on select
+        form = NewQuestionForm(category=category, tutorial=tutorial,
+                               minute_range=minute_range, second_range=second_range)
+        context['category'] = category
+    context['form'] = form
+    context.update(csrf(request))
+    return render(request, 'website/templates/new-question-general.html', context)
 
 # Notification Section
 
