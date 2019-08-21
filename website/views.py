@@ -4,6 +4,7 @@ from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidde
 from django.shortcuts import render, get_object_or_404
 from django.core.context_processors import csrf
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db.models import Q
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -19,7 +20,7 @@ from spoken_auth.models import FossCategory
 from sortable import SortableHeader, get_sorted_list, get_field_index
 from django.db.models import Count
 
-
+from spam_checker import check_for_cuss, remove_stop_words
 User = get_user_model()
 categories = []
 trs = TutorialResources.objects.filter(Q(status=1) | Q(status=2), language__name='English')
@@ -258,9 +259,17 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 def new_question(request):
     context = {}
     if request.method == 'POST':
-        form = NewQuestionForm(request.POST)
-        if form.is_valid():
+        form = NewQuestionForm(request.POST)        
+        spam_flag = False
+        if form.is_valid():            
             cleaned_data = form.cleaned_data
+            category = request.POST.get('category', None)
+            tutorial = request.POST.get('tutorial', None)
+            content = request.POST['body']
+            title = request.POST['title'] 
+            minute_range = request.POST.get('minute_range', None) 
+            second_range = request.POST.get('second_range', None)
+
             question = Question()
             question.uid = request.user.id
             question.category = cleaned_data['category'].replace(' ', '-')
@@ -269,11 +278,27 @@ def new_question(request):
             question.second_range = cleaned_data['second_range']
             question.title = cleaned_data['title']
             question.body = cleaned_data['body'].encode('unicode_escape')
+
+            if check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):
+                              
+                display_message = "You have entered a word which is either harmful or profligate according to our system.\
+                Your question has been added for Admin Review."
+                context['spam'] = display_message                
+                question.status = 0
+                spam_flag = True
+
             question.views = 1
             question.save()
+            context['tut'] = tutorial
+            context['minute_range'] = minute_range            
+            context['second_range'] = second_range
+            context['body'] = content.lstrip().rstrip()
+            context['title2'] = title
+            context['form'] = form
+            context['category'] = category
 
             # Sending email when a new question is asked
-            subject = 'New Forum Question'
+            
             message = """
                 The following new question has been posted in the Spoken Tutorial Forum: <br>
                 Title: <b>{0}</b><br>
@@ -288,16 +313,28 @@ def new_question(request):
                 'http://forums.spoken-tutorial.org/question/' + str(question.id),
                 question.body
             )
-            email = EmailMultiAlternatives(
-                subject, '', 'forums',
-                ['team@spoken-tutorial.org', 'team@fossee.in'],
-                headers={"Content-type": "text/html;charset=iso-8859-1"}
-            )
-            email.attach_alternative(message, "text/html")
-            email.send(fail_silently=True)
-            # End of email send
-
-            return HttpResponseRedirect('/')
+            if spam_flag :
+                subject = 'New Forum Question in Spams'
+                email = EmailMultiAlternatives(
+                    subject, '', 'forums',
+                    ['admin@spoken-tutorial.org', 'nancyvarkey.iitb@gmail.com'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                # End of email send
+                return render(request, 'website/templates/new-question.html', context)
+            else:
+                subject = 'New Forum Question'
+                email = EmailMultiAlternatives(
+                    subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                # End of email send
+                return HttpResponseRedirect("/")
     else:
         # get values from URL.
         category = request.GET.get('category', None)
@@ -308,7 +345,9 @@ def new_question(request):
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
         context['category'] = category
-
+        context['tut'] = tutorial
+        context['minute_range'] = minute_range            
+        context['second_range'] = second_range
     context['form'] = form
     context.update(csrf(request))
     return render(request, 'website/templates/new-question.html', context)
@@ -506,11 +545,18 @@ def ajax_similar_questions(request):
     if request.method == 'POST':
         category = request.POST['category']
         tutorial = request.POST['tutorial']
-        # minute_range = request.POST['minute_range']
-        # second_range = request.POST['second_range']
+        category = category.replace(' ','-')
+        tutorial = tutorial.replace(' ','-')
+        title = request.POST['title']
+        important_words = remove_stop_words(title.lower().encode('unicode_escape'))
 
+        questions = Question.objects.none()
         # add more filtering when the forum grows
-        questions = Question.objects.filter(category=category).filter(tutorial=tutorial)
+        for a_word in important_words:
+            required_ques = Question.objects.filter(category=category,tutorial=tutorial,
+                title__icontains=a_word)
+            questions = questions | required_ques
+        print "questions",questions
         context = {
             'questions': questions
         }

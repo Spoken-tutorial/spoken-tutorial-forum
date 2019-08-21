@@ -7,6 +7,8 @@ forums/local_settings.py
 static/CACHE/*
 *.py[cod]
 robots.txt
+cuss.csv
+stopwords_English.csv
 # C extensions
 *.so
 
