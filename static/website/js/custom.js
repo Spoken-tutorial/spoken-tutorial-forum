@@ -100,7 +100,6 @@ $(document).ready(function() {
     });
     
     $title.change(function() {
-        alert("data"+$title.val());
         $.ajax({
             url: "/ajax-similar-questions/",
             type: "POST",
