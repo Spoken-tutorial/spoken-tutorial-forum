@@ -548,18 +548,18 @@ def ajax_similar_questions(request):
         category = category.replace(' ','-')
         tutorial = tutorial.replace(' ','-')
         title = request.POST['title']
-        important_words = remove_stop_words(title.lower().encode('unicode_escape'))
-
+        MIN_LENGTH_OF_TITLE = 3
         questions = Question.objects.none()
-        # add more filtering when the forum grows
-        for a_word in important_words:
-            required_ques = Question.objects.filter(category=category,tutorial=tutorial,
-                title__icontains=a_word)
-            questions = questions | required_ques
-        print "questions",questions
+        if len(title) > MIN_LENGTH_OF_TITLE:
+            important_words = remove_stop_words(title.lower().encode('unicode_escape'))
+            # add more filtering when the forum grows
+            for a_word in important_words:
+                required_ques = Question.objects.filter(category=category,tutorial=tutorial,
+                    title__icontains=a_word)
+                questions = questions | required_ques
         context = {
-            'questions': questions
-        }
+                'questions': questions
+            }
         return render(request, 'website/templates/ajax-similar-questions.html', context)
 
 
