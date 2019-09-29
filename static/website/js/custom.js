@@ -42,6 +42,7 @@ $(document).ready(function() {
         /* see thread-user.js */
         $("#question-details-ok").show();
         var category = $(this).val();
+        
         if(category == "General") {
             /* disabling all other fields */
             $tutorial.html("<option value='None'>Not required</option>");

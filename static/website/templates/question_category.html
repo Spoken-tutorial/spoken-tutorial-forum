@@ -1,0 +1,43 @@
+{% extends 'website/templates/base.html' %}
+{% load static %}
+
+{% block content %}
+
+<h2>Which type of question do you wish to ask? </h2>
+<div class ="row" style="margin-top: 40px;">
+    {% if category %}
+    <a href="{% url 'website:new_question' %}?category={{ category|urlencode }}&tutorial={{ tutorial|urlencode }}&minute_range={{ minute_range|urlencode }}&second_range={{ second_range|urlencode }}" style="text-decoration: none;color:black;">
+    {% else %}    
+    <a href="{% url 'website:new_question' %}" style="color:black;">
+    {% endif %}
+        <div class="col-lg-5 col-md-5 card" style="border-color: purple;margin-left: 20px;">
+            <span class="glyphicon glyphicon-film"></span><br>
+            <h2 style="margin-left: 40px;margin-top: 25px;">Tutorial related</h2>
+            
+            <ul style="font-size: 140%;">
+                <li>Questions related to your tutorial</li>
+                <li>Any doubts/queries regarding tutorial topics</li>
+            </ul>
+            
+        </div>
+    </a>
+    <div class="col-lg-1 col-md-1"></div>
+
+    <a href="{% url 'website:new_question_general' %}" style="text-decoration: none;color:black;">
+        <div class="col-md-5 col-lg-5 card" style="border-color: green;margin-left: 20px;">
+            <span class="glyphicon glyphicon-bullhorn"></span><br>
+            <h2 style="margin-left: 40px;margin-top: 25px;">Training related</h2>
+
+
+        <ul style="font-size: 140%;">
+            <li>Online test, participation and registration</li>
+            <li>Audio or video quality problems, suggestions</li>
+        </ul>
+
+        </div>
+
+    </a>
+</div>
+
+{% endblock %}
+
