@@ -264,31 +264,36 @@ def new_question(request):
         if form.is_valid():            
             cleaned_data = form.cleaned_data
             category = request.POST.get('category', None)
-            tutorial = request.POST.get('tutorial', None)
+            #tutorial = request.POST.get('tutorial', None)
+            tutorial = ajax_tutorials(request)
             content = request.POST['body']
             title = request.POST['title'] 
-            minute_range = request.POST.get('minute_range', None) 
-            second_range = request.POST.get('second_range', None)
-
+            #minute_range = request.POST.get('minute_range', None) 
+            #second_range = request.POST.get('second_range', None)
+            duration = ajax_duration(request)
+            minute_range = duration['minutes']
+            second_range = duration['seconds']
             question = Question()
             question.uid = request.user.id
             question.category = cleaned_data['category'].replace(' ', '-')
             question.tutorial = cleaned_data['tutorial'].replace(' ', '-')
-            question.minute_range = cleaned_data['minute_range']
-            question.second_range = cleaned_data['second_range']
+            question.minute_range = minute_range
+            question.second_range = second_range
             question.title = cleaned_data['title']
             question.body = cleaned_data['body'].encode('unicode_escape')
 
             if check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):
                               
-                display_message = "You have entered a word which is either harmful or profligate according to our system.\
+                display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
                 Your question has been added for Admin Review."
                 context['spam'] = display_message                
                 question.status = 0
+                question.views = int(question.views) + 1 
                 spam_flag = True
 
             question.views = 1
-            question.save()
+            if not(question.status == 0 and question.views > 1) :
+                question.save()
             context['tut'] = tutorial
             context['minute_range'] = minute_range            
             context['second_range'] = second_range
@@ -315,24 +320,28 @@ def new_question(request):
             )
             if spam_flag :
                 subject = 'New Forum Question in Spams'
-                email = EmailMultiAlternatives(
-                    subject, '', 'forums',
-                    ['admin@spoken-tutorial.org', 'nancyvarkey.iitb@gmail.com'],
-                    headers={"Content-type": "text/html;charset=iso-8859-1"}
-                )
-                email.attach_alternative(message, "text/html")
-                email.send(fail_silently=True)
+                mail_to = 'admin@spoken-tutorial.org,nancyvarkey.iitb@gmail.com'
+                forums_mail(mail_to, subject, message)
+                # email = EmailMultiAlternatives(
+                #     subject, '', 'forums',
+                #     ['admin@spoken-tutorial.org', 'nancyvarkey.iitb@gmail.com'],
+                #     headers={"Content-type": "text/html;charset=iso-8859-1"}
+                # )
+                # email.attach_alternative(message, "text/html")
+                # email.send(fail_silently=True)
                 # End of email send
                 return render(request, 'website/templates/new-question.html', context)
             else:
                 subject = 'New Forum Question'
-                email = EmailMultiAlternatives(
-                    subject, '', 'forums',
-                    ['team@spoken-tutorial.org', 'team@fossee.in'],
-                    headers={"Content-type": "text/html;charset=iso-8859-1"}
-                )
-                email.attach_alternative(message, "text/html")
-                email.send(fail_silently=True)
+                mail_to = 'team@spoken-tutorial.org,team@fossee.in'
+                forums_mail(mail_to, subject, message)
+                # email = EmailMultiAlternatives(
+                #     subject, '', 'forums',
+                #     ['team@spoken-tutorial.org', 'team@fossee.in'],
+                #     headers={"Content-type": "text/html;charset=iso-8859-1"}
+                # )
+                # email.attach_alternative(message, "text/html")
+                # email.send(fail_silently=True)
                 # End of email send
                 return HttpResponseRedirect("/")
     else:
@@ -555,7 +564,7 @@ def ajax_similar_questions(request):
             # add more filtering when the forum grows
             for a_word in important_words:
                 required_ques = Question.objects.filter(category=category,tutorial=tutorial,
-                    title__icontains=a_word)
+                    title__icontains=a_word, status=1)
                 questions = questions | required_ques
         context = {
                 'questions': questions
