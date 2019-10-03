@@ -39,7 +39,7 @@ def takeThird(elem):
 def check_for_cuss(text):
     dir_path = dirname(realpath(__file__))
     filepath = dir_path+'/'+'cuss.csv'
-    body = re.split(', | ',text.lower())
+    body = re.split(', | ',text.lower().strip())
     with open(filepath,'r') as csvfile:
         spamreader = csv.reader(csvfile, delimiter=',')
         for spam in spamreader:

@@ -49,7 +49,7 @@ class NewQuestionForm(forms.Form):
             category = args[0]['category']
         if FossCategory.objects.filter(foss=category).exists():
             self.fields['category'].initial = category
-            tutorials = TutorialDetails.objects.using('spoken').filter(foss__foss=category)
+            tutorials = TutorialDetails.objects.using('spoken').filter(foss__foss=category).order_by('level', 'order')
             for tutorial in tutorials:
                 tutorial_choices += ((tutorial.tutorial, tutorial.tutorial),)
             self.fields['tutorial'] = forms.CharField(widget=forms.Select(choices=tutorial_choices))

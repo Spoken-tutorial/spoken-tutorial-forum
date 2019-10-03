@@ -265,27 +265,27 @@ def new_question(request):
             cleaned_data = form.cleaned_data
             category = request.POST.get('category', None)
             selected_tutorial = request.POST.get('tutorial', None)
-            tutorial = ajax_tutorials(request)
+            
+	    tutorial = request.POST.get('tutorial', None)
             content = request.POST['body']
             title = request.POST['title'] 
             minute_range = request.POST.get('minute_range', None) 
             second_range = request.POST.get('second_range', None)
             body = cleaned_data['body'].encode('unicode_escape')
-            context['tut'] = tutorial
-            context['minute_range'] = minute_range            
-            context['second_range'] = second_range
-            context['body'] = content.lstrip().rstrip()
-            context['title2'] = title
+            context['tutorial'] = tutorial
+            #context['minute_range'] = minute_range            
+            #context['second_range'] = second_range
+            #context['body'] = content.lstrip().rstrip()
+            #context['title2'] = title
             context['form'] = form
             context['category'] = category
-            repeated_question = Question.objects.filter(category=category,
-                tutorial=selected_tutorial, title=cleaned_data['title'], body=body)
+            repeated_question = Question.objects.filter(category=category.replace(' ', '-'),
+                tutorial=selected_tutorial.replace(' ', '-'), title=cleaned_data['title'], body=body)
             if repeated_question.exists():
-                display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
-                Your question has been added for Admin Review."
+                display_message = "The exact same question was asked before hence has not been saved."
                 context['spam'] = display_message
                 context['questions'] = repeated_question
-                return render(request, 'website/templates/ajax-similar-questions.html', context)
+                return HttpResponseRedirect("/")
             else:
                 question = Question()
                 if check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):                              
@@ -354,12 +354,12 @@ def new_question(request):
         # get values from URL.
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
-        minute_range = request.GET.get('minute_range', None)
+	minute_range = request.GET.get('minute_range', None)
         second_range = request.GET.get('second_range', None)
         # pass minute_range and second_range value to NewQuestionForm to populate on select
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
-        context['category'] = category
+	context['category'] = category
         context['tut'] = tutorial
         context['minute_range'] = minute_range            
         context['second_range'] = second_range
