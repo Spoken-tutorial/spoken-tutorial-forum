@@ -264,36 +264,13 @@ def new_question(request):
         if form.is_valid():            
             cleaned_data = form.cleaned_data
             category = request.POST.get('category', None)
-            #tutorial = request.POST.get('tutorial', None)
+            selected_tutorial = request.POST.get('tutorial', None)
             tutorial = ajax_tutorials(request)
             content = request.POST['body']
             title = request.POST['title'] 
-            #minute_range = request.POST.get('minute_range', None) 
-            #second_range = request.POST.get('second_range', None)
-            duration = ajax_duration(request)
-            minute_range = duration['minutes']
-            second_range = duration['seconds']
-            question = Question()
-            question.uid = request.user.id
-            question.category = cleaned_data['category'].replace(' ', '-')
-            question.tutorial = cleaned_data['tutorial'].replace(' ', '-')
-            question.minute_range = minute_range
-            question.second_range = second_range
-            question.title = cleaned_data['title']
-            question.body = cleaned_data['body'].encode('unicode_escape')
-
-            if check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):
-                              
-                display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
-                Your question has been added for Admin Review."
-                context['spam'] = display_message                
-                question.status = 0
-                question.views = int(question.views) + 1 
-                spam_flag = True
-
-            question.views = 1
-            if not(question.status == 0 and question.views > 1) :
-                question.save()
+            minute_range = request.POST.get('minute_range', None) 
+            second_range = request.POST.get('second_range', None)
+            body = cleaned_data['body'].encode('unicode_escape')
             context['tut'] = tutorial
             context['minute_range'] = minute_range            
             context['second_range'] = second_range
@@ -301,49 +278,78 @@ def new_question(request):
             context['title2'] = title
             context['form'] = form
             context['category'] = category
-
-            # Sending email when a new question is asked
-            
-            message = """
-                The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{0}</b><br>
-                Category: <b>{1}</b><br>
-                Tutorial: <b>{2}</b><br>
-                Link: <a href="{3}">{3}</a><br>
-                Question: <b>{4}</b><br>
-            """.format(
-                question.title,
-                question.category,
-                question.tutorial,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id),
-                question.body
-            )
-            if spam_flag :
-                subject = 'New Forum Question in Spams'
-                mail_to = 'admin@spoken-tutorial.org,nancyvarkey.iitb@gmail.com'
-                forums_mail(mail_to, subject, message)
-                # email = EmailMultiAlternatives(
-                #     subject, '', 'forums',
-                #     ['admin@spoken-tutorial.org', 'nancyvarkey.iitb@gmail.com'],
-                #     headers={"Content-type": "text/html;charset=iso-8859-1"}
-                # )
-                # email.attach_alternative(message, "text/html")
-                # email.send(fail_silently=True)
-                # End of email send
-                return render(request, 'website/templates/new-question.html', context)
+            repeated_question = Question.objects.filter(category=category,
+                tutorial=selected_tutorial, title=cleaned_data['title'], body=body)
+            if repeated_question.exists():
+                display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
+                Your question has been added for Admin Review."
+                context['spam'] = display_message
+                context['questions'] = repeated_question
+                return render(request, 'website/templates/ajax-similar-questions.html', context)
             else:
-                subject = 'New Forum Question'
-                mail_to = 'team@spoken-tutorial.org,team@fossee.in'
-                forums_mail(mail_to, subject, message)
-                # email = EmailMultiAlternatives(
-                #     subject, '', 'forums',
-                #     ['team@spoken-tutorial.org', 'team@fossee.in'],
-                #     headers={"Content-type": "text/html;charset=iso-8859-1"}
-                # )
-                # email.attach_alternative(message, "text/html")
-                # email.send(fail_silently=True)
-                # End of email send
-                return HttpResponseRedirect("/")
+                question = Question()
+                if check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):                              
+                    display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
+                    Your question has been added for Admin Review."
+                    context['spam'] = display_message                
+                    question.status = 0
+                    spam_flag = True
+            
+                question.uid = request.user.id
+                question.category = cleaned_data['category'].replace(' ', '-')
+                question.tutorial = cleaned_data['tutorial'].replace(' ', '-')
+                question.minute_range = minute_range
+                question.second_range = second_range
+                question.title = cleaned_data['title']
+                question.body = body
+                question.views = 1
+                question.save()
+            
+
+                # Sending email when a new question is asked
+                
+                message = """
+                    The following new question has been posted in the Spoken Tutorial Forum: <br>
+                    Title: <b>{0}</b><br>
+                    Category: <b>{1}</b><br>
+                    Tutorial: <b>{2}</b><br>
+                    Link: <a href="{3}">{3}</a><br>
+                    Question: <b>{4}</b><br>
+                """.format(
+                    question.title,
+                    question.category,
+                    question.tutorial,
+                    'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                    question.body
+                )
+                if spam_flag :
+                    subject = 'New Forum Question in Spams'
+                    #mail_to = 'admin@spoken-tutorial.org,nancyvarkey.iitb@gmail.com'
+                    mail_to = 'adhikarysaurabh@gmail.com'
+                    forums_mail(mail_to, subject, message)
+                    # email = EmailMultiAlternatives(
+                    #     subject, '', 'forums',
+                    #     ['admin@spoken-tutorial.org', 'nancyvarkey.iitb@gmail.com'],
+                    #     headers={"Content-type": "text/html;charset=iso-8859-1"}
+                    # )
+                    # email.attach_alternative(message, "text/html")
+                    # email.send(fail_silently=True)
+                    # End of email send
+                    return render(request, 'website/templates/new-question.html', context)
+                else:
+                    subject = 'New Forum Question'
+                    #mail_to = 'team@spoken-tutorial.org,team@fossee.in'
+                    mail_to = 'adhikarysaurabh@gmail.com'
+                    forums_mail(mail_to, subject, message)
+                    # email = EmailMultiAlternatives(
+                    #     subject, '', 'forums',
+                    #     ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    #     headers={"Content-type": "text/html;charset=iso-8859-1"}
+                    # )
+                    # email.attach_alternative(message, "text/html")
+                    # email.send(fail_silently=True)
+                    # End of email send
+                    return HttpResponseRedirect("/")
     else:
         # get values from URL.
         category = request.GET.get('category', None)
