@@ -19,21 +19,14 @@
             {% render_field form.category class+="form-control"%} 
         </div>
         <div class="col-lg-3 col-md-3 col-sm-3">
-            {% if tutorial %}
                 {% render_field form.tutorial class+="form-control" %}
-            {% else %}
-                {% if category %}
-                    {% render_field form.tutorial class+="form-control" %} 
-                {% else %}
-                    {% render_field form.tutorial class+="form-control" disabled="disabled" %} 
-                {% endif %}
-            {% endif %}
+                
         </div>
         <div class="col-lg-2 col-md-2 col-sm-2">
-            {% render_field form.minute_range class+="form-control" disabled="disabled" %} 
+            {% render_field form.minute_range class+="form-control" %} 
         </div>
         <div class="col-lg-2 col-md-2 col-sm-2">
-            {% render_field form.second_range class+="form-control" disabled="disabled" %} 
+            {% render_field form.second_range class+="form-control" %} 
         </div>
         <div class="col-lg-2 col-md-2 col-sm-2">
             <small><strong>
@@ -51,7 +44,7 @@
             <div class="form-group">
                 {% if help %}
                 <div class="alert" style="background-color: #7f8c8d;color: white;font-size: 95%;font-family: sans serif;font-weight: 400;">
-                    {{ help }} 
+                    {{ help }}
                     {% if title %}
                     <input class="btn btn-success" style="margin-left:20px;" type="submit" name="action" value="Yes">
                     <a href="/"><button class="btn btn-danger" style="margin-left:20px;" type="button">No</button></a>
@@ -69,7 +62,7 @@
             </div>
         </div>
     </div>
-    <input class="btn btn-success" type="submit" name="action" value="Submit Question"> 
+    <input class="btn btn-success" type="submit" value="Submit Question" name="action"> 
     {% endwith %}
     </form>
 
@@ -97,46 +90,21 @@ bkLib.onDomLoaded(function() {
     }).panelInstance('id_body');
 });
 
-
-
-</script>
-{% endblock %}
-
-{% block javascript %}
+$tutorial =$("#id_tutorial");
+$tutorial.html("<option value='General' selected=true>General</option>");
+$minute_range=$("#id_minute_range");
+$minute_range.html("<option value='None' selected=true>Not necessary</option>");
+$second_range=$("#id_second_range");
+$second_range.html("<option value='None' selected=true>Not necessary</option>");
 
 {% if body and title %}
-<script type="text/javascript">
         $('#id_body').val("{{ body }}");
 
         $('#id_title').val("{{ title }}");
-        $tutorial =$("#id_tutorial");
-        $tutorial.html("<option value='General' selected=true>General</option>");
-        $minute_range=$("#id_minute_range");
-        $second_range=$("#id_second_range");
-        $minute_range.html("<option value='None'>Not required</option>");
-        $minute_range.removeAttr("disabled");
-        $second_range.html("<option value='None'>Not required</option>");
-        $second_range.removeAttr("disabled");
-</script>
-{% elif body and title2 %}
-<script type="text/javascript">
-
-        $('#id_body').val("{{ body }}");
-        $('#id_title').val("{{ title2 }}");
-        $tut =$("#id_tutorial");
-        $tut.html("<option value='{{ tut }}' selected=true>{{ tut }}</option>");
-        $tut.removeAttr("disabled");
-        $minute_range=$("#id_minute_range");
-        $second_range=$("#id_second_range");
-        $minute_range.html("<option value='None'>Not required</option>");
-        $minute_range.removeAttr("disabled");
-        $second_range.html("<option value='None'>Not required</option>");
-        $second_range.removeAttr("disabled");        
-
-</script>
-{% else %}
-
-    <script src="{% static 'website/js/custom.js' %}"></script>
-
 {% endif %}
+
+</script>
+
+
 {% endblock %}
+
