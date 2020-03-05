@@ -250,7 +250,37 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
     if 'qid' in request.GET:
         context['qid'] = int(request.GET['qid'])
 
-    context['questions'] = questions.order_by('category', 'tutorial', 'minute_range', 'second_range')
+    #context['questions'] = questions.order_by('category', 'tutorial', 'minute_range', 'second_range')
+
+    raw_get_data = request.GET.get('o', None)
+
+    header = {
+                1: SortableHeader('category', True, 'Foss'),
+                2: SortableHeader('tutorial', True, 'Tutorial Name'),
+                3: SortableHeader('minute_range', True, 'Mins'),
+                4: SortableHeader('second_range', True, 'Secs'),
+                5: SortableHeader('title', True, 'Title'),
+                6: SortableHeader('date_created', True, 'Date'),
+                7: SortableHeader('views', True, 'Views'),
+                8: SortableHeader('total_answers', 'True', 'Answers'),
+                9: SortableHeader('username', False, 'User')
+            }
+
+    tmp_recs = get_sorted_list(request, questions, header, raw_get_data)
+    ordering = get_field_index(raw_get_data)
+    paginator = Paginator(tmp_recs, 20)
+    page = request.GET.get('page')
+    try:
+        questions = paginator.page(page)
+    except PageNotAnInteger:
+        questions = paginator.page(1)
+    except EmptyPage:
+        questions = paginator.page(paginator.num_pages)
+    context = {
+        'questions': questions,
+        'header': header,
+        'ordering': ordering
+        }
     return render(request, 'website/templates/filter.html', context)
 
 
