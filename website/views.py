@@ -251,7 +251,7 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
         context['qid'] = int(request.GET['qid'])
 
     #context['questions'] = questions.order_by('category', 'tutorial', 'minute_range', 'second_range')
-
+    questions = questions.annotate(total_answers=Count('answer'))
     raw_get_data = request.GET.get('o', None)
 
     header = {
