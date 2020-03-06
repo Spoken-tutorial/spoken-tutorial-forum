@@ -590,7 +590,19 @@ def ajax_keyword_search(request):
         key = request.POST['key']
         questions = Question.objects.filter(
             Q(title__icontains=key) | Q(category__icontains=key) |
-            Q(tutorial__icontains=key) | Q(body__icontains=key), status=1)
+            Q(tutorial__icontains=key) | Q(body__icontains=key), status=1
+            ).order_by('-date_created')
+        paginator = Paginator(questions, 20)
+        page = request.POST.get('page')
+        if page:
+            page = int(request.POST.get('page'))
+            questions = paginator.page(page)
+        try:
+            questions = paginator.page(page)
+        except PageNotAnInteger:
+            questions = paginator.page(1)
+        except EmptyPage:
+            questions = paginator.page(paginator.num_pages)
         context = {
             'questions': questions
         }
