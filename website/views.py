@@ -2,7 +2,7 @@ import json
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
-from django.core.context_processors import csrf
+from django.template.context_processors import csrf
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
@@ -14,16 +14,17 @@ from website.models import Question, Answer, Notification, AnswerComment
 from spoken_auth.models import TutorialDetails, TutorialResources
 from website.forms import NewQuestionForm, AnswerQuesitionForm
 from website.helpers import get_video_info, prettify
-from forums.config import VIDEO_PATH
+from django.conf  import settings
 from website.templatetags.permission_tags import can_edit
 from spoken_auth.models import FossCategory
-from sortable import SortableHeader, get_sorted_list, get_field_index
+from .sortable import SortableHeader, get_sorted_list, get_field_index
 from django.db.models import Count
 
-from spam_checker import check_for_cuss, remove_stop_words
+#from spam_checker import check_for_cuss, remove_stop_words
+from . import spam_checker as sc
 User = get_user_model()
 categories = []
-trs = TutorialResources.objects.filter(Q(status=1) | Q(status=2), language__name='English')
+trs = TutorialResources.objects.filter(Q(status=1) | Q(status=2),tutorial_detail__foss__show_on_homepage__lt=2, language__name='English')
 trs = trs.values('tutorial_detail__foss__foss').order_by('tutorial_detail__foss__foss')
 
 for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
@@ -125,7 +126,7 @@ def question_answer(request):
             answer = Answer()
             answer.uid = request.user.id
             answer.question = question
-            answer.body = body.encode('unicode_escape')
+            answer.body = body
             answer.save()
             if question.uid != request.user.id:
                 notification = Notification()
@@ -159,7 +160,7 @@ def question_answer(request):
                 email.attach_alternative(message, "text/html")
                 email.send(fail_silently=True)
                 # End of email send
-        return HttpResponseRedirect('/question/' + str(qid) + "#answer" + str(answer.id))
+            return HttpResponseRedirect('/question/' + str(qid) + "#answer" + str(answer.id))
     return HttpResponseRedirect('/')
 
 
@@ -172,7 +173,7 @@ def answer_comment(request):
         comment = AnswerComment()
         comment.uid = request.user.id
         comment.answer = answer
-        comment.body = body.encode('unicode_escape')
+        comment.body = body
         comment.save()
 
         # notifying the answer owner
@@ -265,8 +266,7 @@ def new_question(request):
             cleaned_data = form.cleaned_data
             category = request.POST.get('category', None)
             selected_tutorial = request.POST.get('tutorial', None)
-            
-	    tutorial = request.POST.get('tutorial', None)
+            tutorial = request.POST.get('tutorial', None)
             content = request.POST['body']
             title = request.POST['title'] 
             minute_range = request.POST.get('minute_range', None) 
@@ -288,7 +288,7 @@ def new_question(request):
                 return HttpResponseRedirect("/")
             else:
                 question = Question()
-                if check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):                              
+                if sc.check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):                              
                     display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
                     Your question has been added for Admin Review."
                     context['spam'] = display_message                
@@ -350,16 +350,54 @@ def new_question(request):
                     # email.send(fail_silently=True)
                     # End of email send
                     return HttpResponseRedirect("/")
+
+            question = Question()
+            question.uid = request.user.id
+            question.category = cleaned_data['category'].replace(' ', '-')
+            question.tutorial = cleaned_data['tutorial'].replace(' ', '-')
+            question.minute_range = cleaned_data['minute_range']
+            question.second_range = cleaned_data['second_range']
+            question.title = cleaned_data['title']
+            question.body = cleaned_data['body']
+            question.views = 1
+            question.save()
+
+            # Sending email when a new question is asked
+            subject = 'New Forum Question'
+            message = """
+                The following new question has been posted in the Spoken Tutorial Forum: <br>
+                Title: <b>{0}</b><br>
+                Category: <b>{1}</b><br>
+                Tutorial: <b>{2}</b><br>
+                Link: <a href="{3}">{3}</a><br>
+                Question: <b>{4}</b><br>
+            """.format(
+                question.title,
+                question.category,
+                question.tutorial,
+                'http://forums.spoken-tutorial.org/question/' + str(question.id),
+                question.body
+            )
+            email = EmailMultiAlternatives(
+                subject, '', 'forums',
+                ['team@spoken-tutorial.org', 'team@fossee.in'],
+                headers={"Content-type": "text/html;charset=iso-8859-1"}
+            )
+            email.attach_alternative(message, "text/html")
+            email.send(fail_silently=True)
+            # End of email send
+
+            return HttpResponseRedirect('/')
     else:
         # get values from URL.
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
-	minute_range = request.GET.get('minute_range', None)
+        minute_range = request.GET.get('minute_range', None)
         second_range = request.GET.get('second_range', None)
         # pass minute_range and second_range value to NewQuestionForm to populate on select
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
-	context['category'] = category
+        context['category'] = category
         context['tut'] = tutorial
         context['minute_range'] = minute_range            
         context['second_range'] = second_range
@@ -467,7 +505,7 @@ def ajax_duration(request):
             Q(language__name='English')
         )
         video_path = '{0}/{1}/{2}/{3}'.format(
-            VIDEO_PATH,
+            settings.VIDEO_PATH,
             str(video_detail.foss_id),
             str(video_detail.id),
             video_resource.video
@@ -499,7 +537,7 @@ def ajax_question_update(request):
         question = get_object_or_404(Question, pk=qid)
         if can_edit(user=request.user, obj=question):
             question.title = title
-            question.body = body.encode('unicode_escape')
+            question.body = body
             question.save()
             return HttpResponse("saved")
 
@@ -535,7 +573,7 @@ def ajax_answer_update(request):
         body = request.POST['answer_body']
         answer = get_object_or_404(Answer, pk=aid)
         if can_edit(user=request.user, obj=answer):
-            answer.body = body.encode('unicode_escape')
+            answer.body = body
             answer.save()
             return HttpResponse("saved")
 
@@ -549,7 +587,7 @@ def ajax_answer_comment_update(request):
         comment_body = request.POST["comment_body"]
         comment = get_object_or_404(AnswerComment, pk=comment_id)
         if can_edit(user=request.user, obj=comment):
-            comment.body = comment_body.encode('unicode_escape')
+            comment.body = comment_body
             comment.save()
             return HttpResponse("saved")
 
@@ -566,7 +604,7 @@ def ajax_similar_questions(request):
         MIN_LENGTH_OF_TITLE = 3
         questions = Question.objects.none()
         if len(title) > MIN_LENGTH_OF_TITLE:
-            important_words = remove_stop_words(title.lower().encode('unicode_escape'))
+            important_words = sc.remove_stop_words(title.lower().encode('unicode_escape'))
             # add more filtering when the forum grows
             for a_word in important_words:
                 required_ques = Question.objects.filter(category=category,tutorial=tutorial,
