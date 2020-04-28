@@ -36,12 +36,14 @@
     <hr>
     
     {% if spam %}
-    <div class="alert alert-danger alert-dismissible  show" style="color: white;font-size: 95%;font-family: sans serif;font-weight: 400;" role="alert">
+    <div id="spam" class="alert alert-danger alert-dismissible  show" style="color: white;font-size: 95%;font-family: sans serif;font-weight: 400;" role="alert">
 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
   <span aria-hidden="true">&times;</span>
 </button>
     {{ spam }}
 <br><br><a href="/"> Back to Home</a>
+
+<meta http-equiv="refresh" content="5" />
 </div>
     {% endif %}
     <p>Please enter your question details.</p>

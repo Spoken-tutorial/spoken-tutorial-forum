@@ -36,10 +36,17 @@ def parse_html(text):
 def takeThird(elem):
     return elem[2]
 
+import re
+def striphtml(data):
+    p = re.compile(r'<.*?>')
+    return p.sub('', data)
+
+
 def check_for_cuss(text):
+    #text = striphtml(text)
     dir_path = dirname(realpath(__file__))
     filepath = dir_path+'/'+'cuss.csv'
-    body = re.split(', | ',text.lower().strip())
+    body = re.split(', | ',str(text).lower().strip())
     with open(filepath,'r') as csvfile:
         spamreader = csv.reader(csvfile, delimiter=',')
         for spam in spamreader:
@@ -49,6 +56,7 @@ def check_for_cuss(text):
             return False
 
 def remove_stop_words(text):
+    #text = striphtml(text)
     title_words = re.split(', | ',str(text).lower())
     print("My words are :",title_words)
     important_words = []

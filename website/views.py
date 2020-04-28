@@ -318,7 +318,7 @@ def new_question(request):
                 return HttpResponseRedirect("/")
             else:
                 question = Question()
-                if sc.check_for_cuss(cleaned_data['body'].lower().encode('unicode_escape')):                              
+                if sc.check_for_cuss(cleaned_data['body'].encode('unicode_escape').lower()):                              
                     display_message = "You have entered a word which is either harmful or inappropriate according to our system.\
                     Your question has been added for Admin Review."
                     context['spam'] = display_message                
