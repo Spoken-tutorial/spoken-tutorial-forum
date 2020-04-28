@@ -49,14 +49,13 @@ def check_for_cuss(text):
             return False
 
 def remove_stop_words(text):
-    title_words = re.split(', | ',text.lower())
+    title_words = re.split(', | ',str(text).lower())
     print("My words are :",title_words)
     important_words = []
     dir_path = dirname(realpath(__file__))
     filepath = dir_path+'/'+'stopwords_English.csv'
     with open(filepath,'r') as csvfile:
-        stop_words = csv.reader(csvfile, delimiter=',').next()
-        print("stop_words",stop_words)
+        stop_words = csv.reader(csvfile, delimiter=',')
         for a_word in title_words:
             if a_word not in stop_words :
                 important_words.append(a_word)
