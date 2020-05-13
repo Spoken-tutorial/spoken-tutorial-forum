@@ -543,14 +543,13 @@ def ajax_similar_questions(request):
         top_ques = []
         questions = Question.objects.filter(category=category,tutorial=tutorial)
         for question in questions:
-             similarity = get_similar_questions(user_title,question.title)
-             if similarity >= THRESHOLD:
-                top_ques.append([similarity,question.id])
-        top_ques = sorted(top_ques, reverse=True)
-        ids = [y for x,y in top_ques]
-        questions = questions.filter(id__in=ids)
+             question.similarity= get_similar_questions(user_title,question.title)
+             if question.similarity >= THRESHOLD:
+                top_ques.append(question)
+        top_ques = sorted(top_ques,key=lambda x : x.similarity, reverse=True)
         context = {
-            'questions': questions
+            'questions': top_ques,
+            'questions_count':len(top_ques)
         }
         return render(request, 'website/templates/ajax-similar-questions.html', context)
 
