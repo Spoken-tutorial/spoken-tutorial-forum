@@ -99,7 +99,7 @@ $(document).ready(function() {
         }
     });
     
-    $title.change(function() {
+    $title.keyup(function() {
         $.ajax({
             url: "/ajax-similar-questions/",
             type: "POST",
