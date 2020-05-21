@@ -165,8 +165,9 @@
             {% if user|can_edit:answer  %}
             <span class="modify" style="display:block">
                 <a class="edit btn btn-xs btn-info vs" href="#body{{ answer.id}}" data-target="body{{ answer.id }}">Edit</a>
-                <a class="delete btn btn-xs btn-info vs" href="#" data-target="body{{ answer.id }}" data-aid="{{ answer.id}}">Delete</a>
                 <a class="save btn btn-xs btn-success vs"  data-target="body{{ answer.id }}" data-aid="{{ answer.id }}" href="#">Save</a>
+                <a class="delete btn btn-xs btn-info vs" href="#" data-aid="{{ answer.id}}">Delete</a>
+
             </span>
             {% endif %}
         </div> <!-- /.answer -->
