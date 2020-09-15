@@ -252,6 +252,7 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 
     #context['questions'] = questions.order_by('category', 'tutorial', 'minute_range', 'second_range')
     questions = questions.annotate(total_answers=Count('answer'))
+    questions = questions.order_by('-date_created', 'category', 'tutorial')
     raw_get_data = request.GET.get('o', None)
 
     header = {
