@@ -30,7 +30,7 @@ for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
 
 
 def home(request):
-    questions = Question.objects.filter(status=1).order_by('date_created').reverse()[:10]
+    questions = Question.objects.filter(status=1).order_by('date_created').reverse()[:100]
     context = {
         'categories': categories,
         'questions': questions
