@@ -16,6 +16,7 @@ class Question(models.Model):
     date_modified = models.DateTimeField(auto_now=True)
     views = models.IntegerField(default=1)
     status = models.IntegerField(default=1)
+    last_active = models.DateTimeField(null=True)
     # votes = models.IntegerField(default=0)
 
     def user(self):
