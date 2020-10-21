@@ -17,10 +17,15 @@ class Question(models.Model):
     views = models.IntegerField(default=1)
     status = models.IntegerField(default=1)
     last_active = models.DateTimeField(null=True)
+    last_post_by = models.IntegerField(null=True)
     # votes = models.IntegerField(default=0)
 
     def user(self):
         user = User.objects.get(id=self.uid)
+        return user.username
+    
+    def last_post_user(self):
+        user = User.objects.get(id=self.last_post_by)
         return user.username
 
     class Meta:

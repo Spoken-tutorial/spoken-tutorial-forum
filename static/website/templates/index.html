@@ -176,11 +176,12 @@ $("#activelistTable").tablesorter({
                         <th> Min </th>
                         <th> Sec </th>
                         <th> Question <span class="glyphicon glyphicon-link"></span></th>
-                        <th> First Post </th>
-                        <th>Recent Post</th>
+                        <th> First Post on</th>
+                        <th> First Post by</th>
+                        <th>Recent Post on </th>
+                        <th>Recent Post by</th>
                         <th> Views</th>
                         <th> Answers</th>
-                        <th> User</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -232,12 +233,22 @@ $("#activelistTable").tablesorter({
                                     </i>
                                 </span>
                             </td>
+                            <td>
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
+                                    {{ question.user|truncatechars:10 }}
+                                </span>
+                            </td>
                             
                             <td>    
                                 <span>
                                     <i>
                                         {{ question.last_active }}
                                     </i>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.last_post_user }}">
+                                    {{ question.last_post_user|truncatechars:10 }}
                                 </span>
                             </td>
                             
@@ -247,12 +258,6 @@ $("#activelistTable").tablesorter({
                             
                             <td>
                                 {{ question.answer_set.count }}
-                            </td>
-                        
-                            <td>
-                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
-                                    {{ question.user|truncatechars:10 }}
-                                </span>
                             </td>
                         </tr>
                         {% endfor %}
