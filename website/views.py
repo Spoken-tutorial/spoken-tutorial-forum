@@ -31,9 +31,11 @@ for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
 
 def home(request):
     questions = Question.objects.filter(status=1).order_by('date_created').reverse()[:100]
+    active_questions = Question.objects.filter(status=1, last_active__isnull=False).order_by('last_active').reverse()[:100]
     context = {
         'categories': categories,
-        'questions': questions
+        'questions': questions,
+        'active_questions':active_questions
     }
     return render(request, "website/templates/index.html", context)
 

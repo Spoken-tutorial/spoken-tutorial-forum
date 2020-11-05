@@ -7,8 +7,14 @@ register = template.Library()
 
 def get_notification(nid):
     notification = Notification.objects.get(pk=nid)
-    question = Question.objects.get(pk=notification.qid)
-    answer = Answer.objects.get(pk=notification.aid)
+    try:
+        question = Question.objects.get(pk=notification.qid)
+    except Question.DoesNotExist:
+        question =  None
+    try:
+        answer = Answer.objects.get(pk=notification.aid)
+    except Answer.DoesNotExist:
+        answer = None
     context = {
         'notification': notification,
         'question': question,
