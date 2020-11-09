@@ -15,12 +15,22 @@ $("#listTable").tablesorter({
 });
 
 $("#activelistTable").tablesorter({
- headers:{ 
-5:{sorter:false}
-},
+
+});
+$("#recentactivelistTable").tablesorter({
 
 });
 
+var searchParams = new URLSearchParams(window.location.search)
+if (searchParams.has('filter_questions')){
+    var param = searchParams.get('filter_questions')
+    if (param == "recent"){
+        document.getElementById("filter_questions").selectedIndex = 1;
+    }
+    else {
+        document.getElementById("filter_questions").selectedIndex = 0;
+    }
+}
 });
 
 
@@ -76,13 +86,14 @@ $("#activelistTable").tablesorter({
     <div class="panel panel-default">
         <div class="panel-heading">
             <ul class="nav nav-tabs">
-                <li class="active"><a data-toggle="tab" href="#recent_question">Recent questions</a></li>
+                <li ><a data-toggle="tab" href="#recent_question">Recent questions</a></li>
                 <li><a data-toggle="tab" href="#most_active">Most active questions</a></li>
+                <li class="active"><a data-toggle="tab" href="#recent_most_active">Recent and Most active questions</a></li>
             </ul>
         </div>
         <div class="panel-body">
             <div class="tab-content">
-            <div id="recent_question" class="tab-pane fade in active">
+            <div id="recent_question" class="tab-pane fade ">
             <table id = "listTable" class="tablesorter-blue">
 							<thead>
 							<tr>
@@ -186,6 +197,112 @@ $("#activelistTable").tablesorter({
                                     </thead>
                                     <tbody>
                         {% for question in active_questions %}
+                        <tr>
+                            <td>
+                                <span href="#" class="category" data-toggle="tooltip" data-placement="top" title="{{ question.category}}">
+                                    {{ question.category|truncatechars:12 }} 
+                                </span>
+                                <a class="pull-right" href="{% url 'website:filter' question.category %}?qid={{ question.id }}">
+                                    <span class="glyphicon glyphicon-search"></span>
+                                </a>
+                            </td>
+                            
+                            <td>
+                                <span class="tutorial" data-toggle="tooltip" data-placement="top" title="{{ question.tutorial}}">
+                                    {{ question.tutorial|truncatechars:12 }}
+                                </span>
+                                <a class="pull-right" href="{% url 'website:filter' question.category question.tutorial %}?qid={{ question.id }}">
+                                    <span class="glyphicon glyphicon-search"></span>
+                                </a>
+                            </td>
+                            
+                            <td>
+                                <span>
+                                    <a href="{% url 'website:filter' question.category question.tutorial question.minute_range %}?qid={{ question.id }}">
+                                        {{ question.minute_range }}
+                                    </a>
+                                </span>
+                            </td>
+                            
+                            <td>        
+                                <span>
+                                    <a href="{% url 'website:filter' question.category question.tutorial question.minute_range question.second_range%}?qid={{ question.id }}">
+                                        {{ question.second_range }}
+                                    </a>
+                                </span>
+                            </td>
+                            
+                            <td>
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.title }}">
+                                    <a href="{% url 'website:get_question' question.id %}{% prettify question.title %}">{{ question.title|truncatechars:40 }}</a>
+                                </span>            
+                            </td>
+                            <td>    
+                                <span>
+                                    <i>
+                                        {{ question.date_created|date:"d-m-y" }}
+                                    </i>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
+                                    {{ question.user|truncatechars:10 }}
+                                </span>
+                            </td>
+                            
+                            <td>    
+                                <span>
+                                    <i>
+                                        {{ question.last_active }}
+                                    </i>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.last_post_user }}">
+                                    {{ question.last_post_user|truncatechars:10 }}
+                                </span>
+                            </td>
+                            
+                            <td>
+                                {{ question.views}}
+                            </td>
+                            
+                            <td>
+                                {{ question.answer_set.count }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+            </div>
+            <div id="recent_most_active" class="tab-pane fade in active">
+                <form method="get" action="{% url 'website:home' %}" >
+                    <div class="form-group">
+                        <label for="filter">Filter:</label>
+                        <select class="form-control" id="filter_questions" name="filter_questions" onchange="this.form.submit()">
+                        <option value="active">Most Active</option>
+                        <option value="recent">Recent</option>
+                        </select>
+                    </div> 
+                </form>
+                <table id = "recentactivelistTable" class="tablesorter-blue">
+                    <thead>
+                    <tr>
+                        <th> FOSS </th>
+                        <th> Tutorial</th>
+                        <th> Min </th>
+                        <th> Sec </th>
+                        <th> Question <span class="glyphicon glyphicon-link"></span></th>
+                        <th> First Post on</th>
+                        <th> First Post by</th>
+                        <th>Recent Post on </th>
+                        <th>Recent Post by</th>
+                        <th> Views</th>
+                        <th> Answers</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                        {% for question in filter_questions %}
                         <tr>
                             <td>
                                 <span href="#" class="category" data-toggle="tooltip" data-placement="top" title="{{ question.category}}">
