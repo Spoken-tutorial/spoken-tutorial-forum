@@ -1,5 +1,5 @@
 import json
-import pandas
+#import pandas
 import os
 import pymongo
 from stackapi import StackAPI
@@ -13,7 +13,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
 
-from website.models import Question, Answer, Notification, AnswerComment
+from website.models import Question, Answer, Notification, AnswerComment, StackQuestions
 from spoken_auth.models import TutorialDetails, TutorialResources, TutorialCommonContent
 from website.forms import NewQuestionForm, AnswerQuesitionForm
 from website.helpers import get_video_info, prettify, clean_user_data, get_similar_questions
@@ -450,7 +450,8 @@ def ajax_tutorials(request):
         tutorials = TutorialDetails.objects.using('spoken').filter(
             foss__foss=category).order_by('level', 'order')
         cat = tutorials[0].foss
-        path = settings.MEDIA_ROOT + 'videos/' + str(cat.pk)
+        #path = settings.VIDEO_PATH + str(cat.pk)
+        path = settings.VIDEO_PATH+str(cat.pk)+'/'
         create_vocab_tfidf(path)
         for tut in tutorials:
             cat_tutorials.append(tut.tutorial)
@@ -588,7 +589,7 @@ def get_questions_from_stack(category, tutorial, query, terms, db_tags):
     mongo_port = os.getenv("URL_MONGO_PORT")
     mongo_url = "mongodb://" + mongo_ip + ":" + mongo_port
     client = pymongo.MongoClient(mongo_url)
-    db = client.stackapi
+    db = client.stackapis
     collec_ques = db.questions
     collec_ques.create_index('question_id')
 
@@ -619,6 +620,58 @@ def get_questions_from_stack(category, tutorial, query, terms, db_tags):
             collec_ques.update({'question_id': entry['question_id']}, entry, upsert=True)
     print(str(len(entries)) + " questions fetched and inserted into mongodb")
 
+def get_questions_from_stack_sql(category, tutorial, query, terms, db_tags):
+    rel_tags = []
+    print("-----"*30,category,'\ntut',tutorial,'\nquery',query,'\nterms',terms,'\ndb_tags',db_tags)
+    # this part is run when the function is called from FAQ page with category and tutorial selected, here query=""
+    if len(db_tags) != 0:
+        rel_tags.extend(db_tags)
+    if len(terms) != 0:
+        rel_tags.extend(terms)
+
+    print("rel_tags")
+    print(rel_tags)
+    category_clean = re.sub(r'\d+','',category).strip(r".,: '")
+    print("category",category_clean)
+    # mongo_ip = os.getenv("URL_MONGO_IP")
+    # mongo_port = os.getenv("URL_MONGO_PORT")
+    # mongo_url = "mongodb://" + mongo_ip + ":" + mongo_port
+    # client = pymongo.MongoClient(mongo_url)
+    # db = client.stackapis
+    #collec_ques = db.questions
+    #collec_ques.create_index('question_id')
+    # fetch questions
+    tot_ques = []
+    all_tags = []
+    entries = []
+    print("Fetching data from stackoverflow.. ")
+    SITE = StackAPI('stackoverflow')
+    # category = category.split()[0]
+    # Fetching questions with only category name(e.g. latex) as tag
+    questions = SITE.fetch('questions', fromdate=1456232494, min=20, tagged=category_clean, sort='votes', order='desc')
+    print("questions :",questions['items'],'\n'*5)
+    entries.extend(questions['items'])
+    # Fetching questions with addition of rel_tags(obtained from quert/srt files)
+    for t in db_tags:
+        questions = SITE.fetch('questions', fromdate=1456232494, min=20, tagged=category_clean+';'+t.lower(), sort='votes', order='desc')
+        entries.extend(questions['items'])
+
+    for t in rel_tags:
+        questions = SITE.fetch('questions', fromdate=1456232494, min=20, tagged=category_clean+';'+t.lower(), sort='votes', order='desc')
+        entries.extend(questions['items'])
+
+    # inserting fetched data into mongodb
+    # if len(entries) > 0:
+    #     for entry in entries:
+    #         collec_ques.update({'question_id': entry['question_id']}, entry, upsert=True)
+    collec_ques, bool_created = StackQuestions.objects.get_or_create(tutorial=tutorial, category = category)
+    if bool_created:
+        collec_ques.stackdata = entries
+        collec_ques.save()
+
+    print(str(len(entries)) + " questions fetched and inserted into mongodb")
+
+
 def ajax_fetch_questions(request):
     if request.method == 'POST':
         category = request.POST['category']
@@ -630,17 +683,17 @@ def ajax_fetch_questions(request):
         db_tags = db_tags[0].keyword.replace(".", "").split(", ")
         print("list of db_tags >>>>>>>>>>>>")
         print(db_tags)
-        filename = settings.MEDIA_ROOT + 'videos/' + str(cat.pk) + '/' + str(td.pk) + '/' + tutorial.replace(' ', '-') + '-English.srt'
+        filename = settings.VIDEO_PATH + str(cat.pk) + '/' + str(td.pk) + '/' + tutorial.replace(' ', '-') + '-English.srt'
         topic_keys = extract_keywords(filename)
         print("topic_keys >>>>>>>>>>>>>")
         print(topic_keys)
 
     ''' Scraping stackoverflow to get questions and store in mongodb '''
-    get_questions_from_stack(category.lower(), tutorial.lower(), '', topic_keys, db_tags)
-    
+    #get_questions_from_stack(category.lower(), tutorial.lower(), '', topic_keys, db_tags)
+    get_questions_from_stack_sql(category.lower(), tutorial.lower(), '', topic_keys, db_tags)
     return HttpResponse("Successfully fetched data from stackoverflow")
 
-def get_questions_from_db(topic_keys, db_tags):
+def get_questions_from_db(topic_keys, db_tags, category, tutorial):
     rel_tags = []
     if len(db_tags) != 0:
         rel_tags.extend(db_tags)
@@ -648,28 +701,36 @@ def get_questions_from_db(topic_keys, db_tags):
         rel_tags.extend(topic_keys)
     print("rel_tags")
     print(rel_tags)
-    mongo_ip = os.getenv("URL_MONGO_IP")
-    mongo_port = os.getenv("URL_MONGO_PORT")
-    mongo_url = "mongodb://" + mongo_ip + ":" + mongo_port
-    client = pymongo.MongoClient(mongo_url)
-    db = client.stackapi
-    collec_ques = db.questions
+    # mongo_ip = os.getenv("URL_MONGO_IP")
+    # mongo_port = os.getenv("URL_MONGO_PORT")
+    # mongo_url = "mongodb://" + mongo_ip + ":" + mongo_port
+    # client = pymongo.MongoClient(mongo_url)
+    # db = client.stackapi
+    # collec_ques = db.questions
 
     questions = []
     tags = []
     q_ids = []
     for t in rel_tags:
-        items = collec_ques.find({"tags": t.lower()})
-        print("Fetched " + str(items.count()) + " questions for tag: " + t.lower())
-        for item in items:
-            tags.extend(item['tags'])
-            if item['question_id'] not in q_ids:
-                acc_ans = ""
-                if 'accepted_answer_id' in item.keys():
-                    acc_ans = str(item['link']) + "#" + str(item['accepted_answer_id'])
-                q_ids.append(item['question_id'])
-                q = {'title': item['title'], 'uid': item['question_id'], 'body': item['link'], 'tags': item['tags'], 'answer_count': item['answer_count'], 'views': item['view_count'], 'score': item['score'], 'owner': item['owner'], 'accepted_answer': acc_ans}
-                questions.append(q)
+        #items = collec_ques.find({"tags": t.lower()})
+        try:
+            items = StackQuestions.objects.get(category = category, tutorial=tutorial)
+            #print("Fetched " + str(items.count()) + " questions for tag: " + t.lower())
+            for item in items.stackdata:
+                tags.extend(item['tags'])
+                if item['question_id'] not in q_ids:
+                    acc_ans = ""
+                    if 'accepted_answer_id' in item.keys():
+                        acc_ans = str(item['link']) + "#" + str(item['accepted_answer_id'])
+                    q_ids.append(item['question_id'])
+                    q = {'title': item['title'],
+                    'uid': item['question_id'], 'body': item['link'],
+                    'tags': item['tags'], 'answer_count': item['answer_count'],
+                    'views': item['view_count'], 'score': item['score'],
+                    'owner': item['owner'], 'accepted_answer': acc_ans}
+                    questions.append(q)
+        except StackQuestions.DoesNotExist:
+            get_questions_from_stack_sql(category, tutorial, '', topic_keys, db_tags)
     return questions, tags
 
 def ajax_faq_questions(request):
@@ -685,13 +746,14 @@ def ajax_faq_questions(request):
         db_tags.append(category)
         print("list of db_tags >>>>>>")
         print(db_tags)
-        filename = settings.MEDIA_ROOT + 'videos/' + str(cat.pk) + '/' + str(td.pk) + '/' + tutorial.replace(' ', '-') + '-English.srt'
+        filename = settings.VIDEO_PATH + str(cat.pk) + '/' + str(td.pk) + '/' + tutorial.replace(' ', '-') + '-English.srt'
         topic_keys = extract_keywords(filename)
         print("topic_keys >>>>>>")
         print(topic_keys)
 
         ''' Fetching questions from mongodb database'''
-        questions, tags = get_questions_from_db(topic_keys, db_tags)
+        #questions, tags = get_questions_from_db(topic_keys, db_tags)
+        questions, tags = get_questions_from_db(topic_keys, db_tags, category.lower(), tutorial.lower())
         print(str(len(questions)) + " relevant questions and tags are ")
         print(set(tags))
         
