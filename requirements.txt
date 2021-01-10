@@ -21,3 +21,4 @@ pandas==0.25.3
 nltk==3.5
 scipy==1.4.1
 sklearn==0.0
+django-mysql==3.10.0
