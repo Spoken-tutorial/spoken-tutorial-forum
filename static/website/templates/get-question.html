@@ -69,11 +69,10 @@
         </a>
         
         <span class="modify question-midify">
-            {% if user|can_edit:question  %}
-                {% if user|can_edit:question or user|can_hide_delete:question  %}
+            {% if user|can_edit:question or user|can_hide_delete:question  %}
+           
                     <a class="hide-question btn btn-xs btn-info" data-qid="{{ question.id }}" data-status="{{ question.status }} href="#">{% if question.status == 1 %} Hide {% else %} Show {% endif %}</a>
                     <a class="delete-question btn btn-xs btn-info" data-qid="{{ question.id }}" href="#">Delete</a> 
-                {% endif %}
                 <a class="edit btn btn-xs btn-info" href="#">Edit</a>
                 <a class="save btn btn-xs btn-success" data-qid="{{ question.id }}" href="#">Save</a>
             {% endif %}
