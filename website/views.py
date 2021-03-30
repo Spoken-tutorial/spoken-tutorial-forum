@@ -476,7 +476,7 @@ def ajax_question_update(request):
         title = request.POST['question_title']
         body = request.POST['question_body']
         question = get_object_or_404(Question, pk=qid)
-        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=answer):
+        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.title = title
             question.body = body
             question.save()
@@ -496,7 +496,7 @@ def ajax_details_update(request):
         minute_range = request.POST['minute_range']
         second_range = request.POST['second_range']
         question = get_object_or_404(Question, pk=qid)
-        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=answer):
+        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.category = category
             question.tutorial = tutorial
             question.minute_range = minute_range
@@ -586,7 +586,7 @@ def ajax_delete_question(request):
     if request.method == "POST":
         key = request.POST['question_id']
         question = get_object_or_404(Question, pk=key)
-        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=answer):
+        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.delete()
             result = True
     return HttpResponse(json.dumps(result), mimetype='application/json')
@@ -598,7 +598,7 @@ def ajax_hide_question(request):
     if request.method == "POST":
         key = request.POST['question_id']
         question = get_object_or_404(Question, pk=key)
-        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=answer):
+        if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.status = 0
             if request.POST['status'] == '0':
                 question.status = 1
