@@ -16,8 +16,8 @@
 
 <div class="row">
     <div class="question-wrapper col-lg-12 col-md-12 col-sm-12 col-xs-12">
-    <div class="question {% if user|can_edit:question %}editable{% endif %}">
-        <div class="title {% if user|can_edit:question %}title-editable{% endif %}">
+    <div class="question {% if user|can_edit:question or user|can_hide_delete:question %}editable{% endif %}">
+        <div class="title {% if user|can_edit:question or user|can_hide_delete:question %}title-editable{% endif %}">
            {{ question.title }}
         </div>
         
@@ -27,7 +27,7 @@
             <h5>Question</h5>
         </div>
         <div id="questionNicPanel"></div>
-        <div id="{% if user|can_edit:question  %}questionInstance{% endif %}" class="body">
+        <div id="{% if user|can_edit:question or user|can_hide_delete:question %}questionInstance{% endif %}" class="body">
             {{ question.body|bleach }}
         </div>
         <br>
