@@ -16,8 +16,8 @@
 
 <div class="row">
     <div class="question-wrapper col-lg-12 col-md-12 col-sm-12 col-xs-12">
-    <div class="question {% if user|can_edit:question %}editable{% endif %}">
-        <div class="title {% if user|can_edit:question %}title-editable{% endif %}">
+    <div class="question {% if user|can_edit:question or user|can_hide_delete:question %}editable{% endif %}">
+        <div class="title {% if user|can_edit:question or user|can_hide_delete:question %}title-editable{% endif %}">
            {{ question.title }}
         </div>
         
@@ -27,7 +27,7 @@
             <h5>Question</h5>
         </div>
         <div id="questionNicPanel"></div>
-        <div id="{% if user|can_edit:question  %}questionInstance{% endif %}" class="body">
+        <div id="{% if user|can_edit:question or user|can_hide_delete:question %}questionInstance{% endif %}" class="body">
             {{ question.body|bleach }}
         </div>
         <br>
@@ -69,9 +69,10 @@
         </a>
         
         <span class="modify question-midify">
-            {% if user|can_edit:question  %}
-                <a class="hide-question btn btn-xs btn-info" data-qid="{{ question.id }}" data-status="{{ question.status }} href="#">{% if question.status == 1 %} Hide {% else %} Show {% endif %}</a>
-                <a class="delete-question btn btn-xs btn-info" data-qid="{{ question.id }}" href="#">Delete</a>
+            {% if user|can_edit:question or user|can_hide_delete:question  %}
+           
+                    <a class="hide-question btn btn-xs btn-info" data-qid="{{ question.id }}" data-status="{{ question.status }} href="#">{% if question.status == 1 %} Hide {% else %} Show {% endif %}</a>
+                    <a class="delete-question btn btn-xs btn-info" data-qid="{{ question.id }}" href="#">Delete</a> 
                 <a class="edit btn btn-xs btn-info" href="#">Edit</a>
                 <a class="save btn btn-xs btn-success" data-qid="{{ question.id }}" href="#">Save</a>
             {% endif %}
