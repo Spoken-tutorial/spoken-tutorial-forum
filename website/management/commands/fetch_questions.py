@@ -14,7 +14,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Generating Question Metadata. Please wait...")
         meta_file_name = 'metadata_'+uuid.uuid4().hex+".csv"
-        with open(settings.MEDIA_ROOT + meta_file_name, "w+", newline='') as metafile:
+        with open(settings.BASE_DIR +"/"+ meta_file_name, "w+", newline='') as metafile:
             metawriter = csv.writer(metafile, dialect='excel', delimiter='|')
             metawriter.writerow(["FOSS","Tutorial","Video Minute Range","Video Second Range","Question Title","Question Body","Question_Date","Question Posted By","Answer No.","Answer Body","Answer Date", "Answer Posted By"])
             foss = options['foss']
