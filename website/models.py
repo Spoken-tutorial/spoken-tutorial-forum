@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django_mysql.models import JSONField
 
 User = get_user_model()
 
@@ -87,4 +88,11 @@ class Notification(models.Model):
         user = User.objects.get(id=self.pid)
         return user.username
 
+class StackQuestions(models.Model):
+    category = models.CharField(max_length=200)
+    tutorial = models.CharField(max_length=200)
+    stackdata = JSONField()
+
+    class Meta(object):
+        unique_together = ('category', 'tutorial')
 # CDEEP database created using inspectdb arg of manage.py
