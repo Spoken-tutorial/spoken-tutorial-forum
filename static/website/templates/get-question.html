@@ -149,7 +149,7 @@
         <div class="answer {% if user|can_edit:answer  %}editable{% endif %}" id="answer{{answer.id}}">
             
             <div class="body" id="body{{ answer.id }}">
-                {{ answer.body|bleach }}
+                {{ answer.body|safe }}
             </div>
             
             <span class="meta">
