@@ -66,7 +66,7 @@ $(document).ready(function() {
         }
     });
 
-    $tutorial.change(function() {
+    $tutorial.on('input', function() {
         /* resetting dropdowns */
         reset("minute_range", "second_range");
         var category = $category.val();
@@ -98,6 +98,35 @@ $(document).ready(function() {
             });
         }
     });
+
+    // this is in faq page
+    $tutorial.change(function() {
+        $.ajax({
+            url: "/ajax-faq-questions/",
+            type: "POST",
+            data: {
+                category: $category.val(),
+                tutorial: $tutorial.val(),
+            },
+            dataType: "html",
+            success: function(data) {
+                $response = $(data);
+                var similar_count= $response.find("#similar-count").text();
+                console.log(similar_count);
+                $("#similar-link").show();
+                $("#modal-body").html(data);
+                
+                $.ajax({
+                    url:"/ajax-fetch-questions/",
+                    type: "POST",
+                    data: {
+                        category: $category.val(),
+                        tutorial: $tutorial.val(),
+                    }
+                });
+            }
+        });
+    });    
     
     $title.keyup(function() {
         var len = $title.val().split(' ').length;
@@ -117,7 +146,8 @@ $(document).ready(function() {
             success: function(data) {
                 $response = $(data);
                 var similar_count= $response.find("#similar-count").text();
-                $("#similar-link").show().html(similar_count);
+                console.log(similar_count);
+                $("#similar-link").show();
                 $("#modal-body").html(data);
             }
         });
