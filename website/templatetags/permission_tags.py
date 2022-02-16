@@ -6,7 +6,7 @@ register = template.Library()
 
 
 def can_edit(user, obj):
-    if user.id == obj.uid or is_administrator(user):
+    if user.id == obj.uid or is_administrator(user) or is_forumsadmin(user):
         return True
     return False
 
