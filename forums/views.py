@@ -1,4 +1,4 @@
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth import login, logout
 from django.shortcuts import render_to_response
 from django.template.context_processors import csrf
@@ -69,3 +69,8 @@ def updatepassword(request):
         context['form'] = form
         context['for_update_password'] = True
         return render_to_response('website/templates/index.html', context)
+
+def robots_txt(request):
+    with open('robots.txt', 'r') as f:
+        content = f.read()
+    return HttpResponse(content, content_type="text/plain")
