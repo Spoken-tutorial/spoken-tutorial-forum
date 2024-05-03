@@ -22,4 +22,6 @@ urlpatterns = [
     url(r'^accounts/logout/', views.user_logout, name='user_logout'),
     url(r'^migrate', chenage_drupal_userid_spoken, name='chenage_drupal_userid_spoken'),
     url(r'^accounts/update-password/$', views.updatepassword, name='updatepassword'),
+
+    url(r'^robots\.txt', views.robots_txt, name='robots-txt'),
 ]
