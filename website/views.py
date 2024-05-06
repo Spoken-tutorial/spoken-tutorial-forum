@@ -4,7 +4,7 @@ from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidde
 from django.shortcuts import render, get_object_or_404
 from django.template.context_processors import csrf
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
@@ -17,7 +17,6 @@ from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
 from .sortable import SortableHeader, get_sorted_list, get_field_index
-from django.db.models import Count
 
 
 User = get_user_model()
@@ -32,10 +31,17 @@ for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
 def home(request):
     questions = Question.objects.filter(status=1).order_by('date_created').reverse()[:100]
     active_questions = Question.objects.filter(status=1, last_active__isnull=False).order_by('last_active').reverse()[:100]
+
+    subquery = Question.objects.filter(category=OuterRef('category')).values('category').annotate(max_date=Max('date_created')).values('max_date')
+    slider_questions = Question.objects.filter(
+            date_created=Subquery(subquery)
+    ).order_by('category')
+    
     context = {
         'categories': categories,
         'questions': questions,
-        'active_questions':active_questions
+        'active_questions':active_questions,
+        'slider_questions': slider_questions
     }
     return render(request, "website/templates/index.html", context)
 
