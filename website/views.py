@@ -4,7 +4,7 @@ from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidde
 from django.shortcuts import render, get_object_or_404
 from django.template.context_processors import csrf
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
@@ -17,7 +17,6 @@ from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
 from .sortable import SortableHeader, get_sorted_list, get_field_index
-from django.db.models import Count
 
 
 User = get_user_model()
@@ -32,11 +31,39 @@ for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
 def home(request):
     questions = Question.objects.filter(status=1).order_by('date_created').reverse()[:100]
     active_questions = Question.objects.filter(status=1, last_active__isnull=False).order_by('last_active').reverse()[:100]
+
+    # Retrieve latest questions per category for the slider
+    subquery = Question.objects.filter(category=OuterRef('category'), status=1).values('category').annotate(max_date=Max('date_created')).values('max_date')
+    slider_questions = Question.objects.filter(
+            date_created=Subquery(subquery), status=1
+    ).order_by('category')
+
+    # Mapping of foss name as in spk db & its corresponding category name in forums db
+    category_fosses = {val.replace(" ", "-") : val for val in categories}    
+
+    # All eligible categories to be shown in homepage slider
+    all_eligible_categories = list(category_fosses.keys())
+    
+    # Create a dictionary to map categories to questions for the slider
+    category_question_map = {}
+    for question in slider_questions:
+        if question.category in all_eligible_categories:
+            foss = category_fosses.get(question.category)
+            category_question_map[foss] = {"id" : question.id, "question": question.title, "foss_url": question.category}
+    
+    # Fill in missing categories without questions
+    for category in category_fosses.keys():
+        foss = category_fosses.get(category)
+        if foss not in category_question_map:
+            category_question_map[foss] = None
+    
+    # Sort category_question_map by category name
+    category_question_map = dict(sorted(category_question_map.items(), key= lambda item: item[0].lower()))
     context = {
-        'categories': categories,
-        'questions': questions,
-        'active_questions':active_questions
-    }
+    'questions': questions,
+    'active_questions':active_questions,
+    'category_question_map': category_question_map
+}
     return render(request, "website/templates/index.html", context)
 
 

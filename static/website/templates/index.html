@@ -25,30 +25,45 @@ $("#activelistTable").tablesorter({
 
 
 </script>
-    <div id="carousel-container">
-        <div class="carousel">
-            {% for category in categories %}
-                <div>
-                    <div class="thumbnail">
-                        {% with file=category|get_category_image %}
-                            {% if file %}
-                                <img src="{% static category|get_category_image %}">
-                            {% else %}
-                                <div class="category-title">{{category}}</div>
-                            {% endif %}
-                        {% endwith %}
-                        <div class="caption">
-                            <small class="category">
-                                {{ category }}
-                            </small>
-                            {% latest_question category %}
-                            <a class="btn btn-xs btn-block btn-success" href="{% url 'website:new_question' %}?category={{ category|urlencode }}">Ask new question</a>
-                        </div>
+<div id="carousel-container">
+    <div class="carousel">
+        {% for category, data in category_question_map.items %}
+            <div>
+                <div class="thumbnail">
+                    {% with file=category|get_category_image %}
+                        {% if file %}
+                            <img src="{% static category|get_category_image %}">
+                        {% else %}
+                            <div class="category-title">{{category}}</div>
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="caption">
+                        
+                        <small class="category">
+                            {{ category }}
+                        </small>
+                        {% if data %}
+                        <small class="latest">
+                            <a href="{% url 'website:get_question' data.id %}">{{ data.question }}</a>
+                        </small>
+                        <a class="btn btn-xs btn-block btn-primary" href="{% url 'website:filter' data.foss_url %}">View previous questions</a>
+                    {% else %}
+                        <small class="latest">
+                            Be the first to ask question.
+                        </small>
+                        <a class="btn btn-block btn-xs">
+                            No questions to display
+                        </a>
+                    {% endif %}
+                        <a class="btn btn-xs btn-block btn-success" href="{% url 'website:new_question' %}?category={{ category|urlencode }}">Ask new question</a>
                     </div>
                 </div>
-            {% endfor %}
-        </div> <!-- /.carousel -->
-    </div> <!-- /#carousel-container -->
+            </div>
+        {% endfor %}
+    </div> <!-- /.carousel -->
+</div> <!-- /#carousel-container -->
+   
 
     <div id="filter-container">
         <div class="row">
