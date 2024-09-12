@@ -45,8 +45,9 @@ def prettify(string):
 
 def pre_process(text):
     text=text.lower()                       # lowercase
-    text=re.sub("<!--?.*?-->","",text)      # remove tags
-    text=re.sub("(\\d|\\W)+"," ",text)      # remove special characters and digits
+    text = re.sub('<.*?>', ' ', text).replace('  ',' ')
+    text=re.sub("<!--?.*?-->"," ",text).replace('  ',' ')      # remove tags
+    text=re.sub("(\\d|\\W)+"," ",text).replace('  ',' ')      # remove special characters and digits
     return text
 
 def clean_user_data(text):
