@@ -1,6 +1,6 @@
 from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth import login, logout
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.template.context_processors import csrf
 
 from forums.forms import UserLoginForm
@@ -29,7 +29,7 @@ def user_login(request):
             'resetpasssucs': resetpasssucs
         }
         context.update(csrf(request))
-        return render_to_response('forums/templates/user-login.html', context)
+        return render(request,'forums/templates/user-login.html', context)
     else:
         return HttpResponseRedirect('/')
 
@@ -49,7 +49,7 @@ def updatepassword(request):
             confirm = request.POST['confirm_new_password']
             if new_password == "" or confirm == "":
                 context['empty'] = True
-                return render_to_response("update-password.html", context)
+                return render(request,"update-password.html", context)
             if new_password == confirm:
                 user.set_password(new_password)
                 user.save()
@@ -61,14 +61,14 @@ def updatepassword(request):
                 return HttpResponseRedirect('/')
             else:
                 context['no_match'] = True
-                return render_to_response("forums/templates/update-password.html", context)
+                return render(request,"forums/templates/update-password.html", context)
         else:
-            return render_to_response("forums/templates/update-password.html", context)
+            return render(request,"forums/templates/update-password.html", context)
     else:
         form = UserLoginForm()
         context['form'] = form
         context['for_update_password'] = True
-        return render_to_response('website/templates/index.html', context)
+        return render(request,'website/templates/index.html', context)
 
 def robots_txt(request):
     with open('robots.txt', 'r') as f:

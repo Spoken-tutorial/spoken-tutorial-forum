@@ -8,11 +8,19 @@ from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
-
+from django.contrib import messages
 from website.models import Question, Answer, Notification, AnswerComment
 from spoken_auth.models import TutorialDetails, TutorialResources
 from website.forms import NewQuestionForm, AnswerQuesitionForm
-from website.helpers import get_video_info, prettify, clean_user_data, get_similar_questions
+from website.helpers import (
+    get_video_info, 
+    prettify, 
+    clean_user_data, 
+    get_similar_questions,
+    SpamQuestionDetector,
+    handle_spam
+)
+
 from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
@@ -68,39 +76,32 @@ def home(request):
 
 
 def questions(request):
-    questions = Question.objects.filter(status=1).order_by('category', 'tutorial')
-    questions = questions.annotate(total_answers=Count('answer'))
+    context = {}
+    if request.method == 'POST':
+        form = NewQuestionForm(request.POST)
+        if form.is_valid():
+            cleaned_data = form.cleaned_data
+            question = Question(
+                uid=request.user.id,
+                category=cleaned_data['category'].replace(' ', '-'),
+                tutorial=cleaned_data['tutorial'].replace(' ', '-'),
+                minute_range=cleaned_data['minute_range'],
+                second_range=cleaned_data['second_range'],
+                title=cleaned_data['title'],
+                body=cleaned_data['body'],
+                views=1,
+            )
+            question.save()
 
-    raw_get_data = request.GET.get('o', None)
+            action = handle_spam(question, request.user, delete_on_high=True)
 
-    header = {
-                1: SortableHeader('category', True, 'Foss'),
-                2: SortableHeader('tutorial', True, 'Tutorial Name'),
-                3: SortableHeader('minute_range', True, 'Mins'),
-                4: SortableHeader('second_range', True, 'Secs'),
-                5: SortableHeader('title', True, 'Title'),
-                6: SortableHeader('date_created', True, 'Date'),
-                7: SortableHeader('views', True, 'Views'),
-                8: SortableHeader('total_answers', 'True', 'Answers'),
-                9: SortableHeader('username', False, 'User')
-            }
-
-    tmp_recs = get_sorted_list(request, questions, header, raw_get_data)
-    ordering = get_field_index(raw_get_data)
-    paginator = Paginator(tmp_recs, 20)
-    page = request.GET.get('page')
-    try:
-        questions = paginator.page(page)
-    except PageNotAnInteger:
-        questions = paginator.page(1)
-    except EmptyPage:
-        questions = paginator.page(paginator.num_pages)
-    context = {
-        'questions': questions,
-        'header': header,
-        'ordering': ordering
-        }
-    return render(request, 'website/templates/questions.html', context)
+            if action == 'AUTO_DELETE':
+                # inform the user, stop further processing (email etc.)
+                messages.error(request, "Your question was removed because it looks like spam.")
+                return HttpResponseRedirect('/')  # or another page
+            elif action == 'FLAGGED':
+                messages.warning(request, "Your question is pending moderator review.")
+            return render(request, 'website/templates/questions.html', context)
 
 
 def hidden_questions(request):
@@ -331,47 +332,57 @@ def new_question(request):
             question.body = cleaned_data['body']
             question.views = 1
             question.save()
+            # Run spam detection
+            action = handle_spam(question, request.user)
 
-            # Sending email when a new question is asked
-            subject = 'New Forum Question'
-            message = """
-                The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{0}</b><br>
-                Category: <b>{1}</b><br>
-                Tutorial: <b>{2}</b><br>
-                Link: <a href="{3}">{3}</a><br>
-                Question: <b>{4}</b><br>
-            """.format(
-                question.title,
-                question.category,
-                question.tutorial,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id),
-                question.body
-            )
-            email = EmailMultiAlternatives(
-                subject, '', 'forums',
-                ['team@spoken-tutorial.org', 'team@fossee.in'],
-                headers={"Content-type": "text/html;charset=iso-8859-1"}
-            )
-            email.attach_alternative(message, "text/html")
-            email.send(fail_silently=True)
-            # End of email send
+            if action == "AUTO_DELETE":
+                messages.error(request, " Your question was removed because it looks like spam.")
+                return HttpResponseRedirect('/')
 
-            return HttpResponseRedirect('/')
+            elif action == "FLAGGED":
+                messages.warning(request, " Your question is pending moderator review.")
+                # Don’t send email for flagged content
+                return HttpResponseRedirect('/')
+
+            else:  # APPROVED
+                
+                subject = 'New Forum Question'
+                message = f"""
+                    The following new question has been posted in the Spoken Tutorial Forum: <br>
+                    Title: <b>{question.title}</b><br>
+                    Category: <b>{question.category}</b><br>
+                    Tutorial: <b>{question.tutorial}</b><br>
+                    Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
+                        http://forums.spoken-tutorial.org/question/{question.id}
+                    </a><br>
+                    Question: <b>{question.body}</b><br>
+                """
+                email = EmailMultiAlternatives(
+                    subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                return HttpResponseRedirect('/')
+
+        # If form not valid → re-render with errors
+        context['form'] = form
+        return render(request, 'website/templates/new-question.html', context)
+
     else:
-        # get values from URL.
+        # GET request → render empty form
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
         second_range = request.GET.get('second_range', None)
-        # pass minute_range and second_range value to NewQuestionForm to populate on select
-        form = NewQuestionForm(category=category, tutorial=tutorial,
-                               minute_range=minute_range, second_range=second_range)
+        form = NewQuestionForm(
+            category=category, tutorial=tutorial,
+            minute_range=minute_range, second_range=second_range
+        )
+        context['form'] = form
         context['category'] = category
-
-    context['form'] = form
-    context.update(csrf(request))
-    return render(request, 'website/templates/new-question.html', context)
+        return render(request, 'website/templates/new-question.html', context)
 
 # Notification Section
 
@@ -616,7 +627,7 @@ def ajax_delete_question(request):
         if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.delete()
             result = True
-    return HttpResponse(json.dumps(result), mimetype='application/json')
+    return HttpResponse(json.dumps(result), content_type='application/json')
 
 
 @login_required
