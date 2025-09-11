@@ -12,15 +12,7 @@ from django.contrib import messages
 from website.models import Question, Answer, Notification, AnswerComment
 from spoken_auth.models import TutorialDetails, TutorialResources
 from website.forms import NewQuestionForm, AnswerQuesitionForm
-from website.helpers import (
-    get_video_info, 
-    prettify, 
-    clean_user_data, 
-    get_similar_questions,
-    SpamQuestionDetector,
-    handle_spam
-)
-
+from website.helpers import get_video_info, prettify,clean_user_data, get_similar_questions, SpamQuestionDetector, handle_spam
 from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
@@ -76,32 +68,39 @@ def home(request):
 
 
 def questions(request):
-    context = {}
-    if request.method == 'POST':
-        form = NewQuestionForm(request.POST)
-        if form.is_valid():
-            cleaned_data = form.cleaned_data
-            question = Question(
-                uid=request.user.id,
-                category=cleaned_data['category'].replace(' ', '-'),
-                tutorial=cleaned_data['tutorial'].replace(' ', '-'),
-                minute_range=cleaned_data['minute_range'],
-                second_range=cleaned_data['second_range'],
-                title=cleaned_data['title'],
-                body=cleaned_data['body'],
-                views=1,
-            )
-            question.save()
+    questions = Question.objects.filter(status=1).order_by('category', 'tutorial')
+    questions = questions.annotate(total_answers=Count('answer'))
+        
+    raw_get_data = request.GET.get('o', None)
+    
+    header = {
+                1: SortableHeader('category', True, 'Foss'),
+                2: SortableHeader('tutorial', True, 'Tutorial Name'),
+                3: SortableHeader('minute_range', True, 'Mins'),
+                4: SortableHeader('second_range', True, 'Secs'),
+                5: SortableHeader('title', True, 'Title'),
+                6: SortableHeader('date_created', True, 'Date'),
+                7: SortableHeader('views', True, 'Views'),
+                8: SortableHeader('total_answers', 'True', 'Answers'),
+                9: SortableHeader('username', False, 'User')
+            }
 
-            action = handle_spam(question, request.user, delete_on_high=True)
-
-            if action == 'AUTO_DELETE':
-                # inform the user, stop further processing (email etc.)
-                messages.error(request, "Your question was removed because it looks like spam.")
-                return HttpResponseRedirect('/')  # or another page
-            elif action == 'FLAGGED':
-                messages.warning(request, "Your question is pending moderator review.")
-            return render(request, 'website/templates/questions.html', context)
+    tmp_recs = get_sorted_list(request, questions, header, raw_get_data)
+    ordering = get_field_index(raw_get_data)
+    paginator = Paginator(tmp_recs, 20)
+    page = request.GET.get('page')
+    try:
+        questions = paginator.page(page)
+    except PageNotAnInteger:
+        questions = paginator.page(1)
+    except EmptyPage:
+        questions = paginator.page(paginator.num_pages)
+    context = {
+        'questions': questions,
+        'header': header,
+        'ordering': ordering
+        }
+    return render(request, 'website/templates/questions.html', context)
 
 
 def hidden_questions(request):
@@ -627,7 +626,7 @@ def ajax_delete_question(request):
         if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.delete()
             result = True
-    return HttpResponse(json.dumps(result), content_type='application/json')
+    return HttpResponse(json.dumps(result), mimetype='application/json')
 
 
 @login_required

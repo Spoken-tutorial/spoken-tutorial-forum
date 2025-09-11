@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from website.models import Question, User
 from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from sklearn.metrics.pairwise import cosine_similarity
 from django.conf import settings
@@ -65,13 +66,11 @@ def pre_process(text):
     return text
 
 def clean_user_data(text):
-    from nltk.tokenize import word_tokenize
     words = word_tokenize(pre_process(text.lower()))
     clean_list = [w for w in words if not w in sw]
     return clean_list
 
 def get_similar_questions(user_ques,question):
-    from nltk.tokenize import word_tokenize
     total = []
     l1 = []
     l2 = []
