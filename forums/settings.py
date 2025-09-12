@@ -291,11 +291,11 @@ LOGGING = {
             'class': 'django.utils.log.AdminEmailHandler'
         },
 
-        # 🔹 New handler for spam detection
+        # New handler for spam detection
         'spam_file': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs/spam_detection.log',  # create logs/ dir
+            'filename': SPAM_LOG_FILE,  # create logs/ dir
             'maxBytes': 1024 * 1024 * 5,   # 5 MB
             'backupCount': 5,              # keep 5 old logs
             'formatter': 'verbose',
@@ -309,7 +309,7 @@ LOGGING = {
             'propagate': True,
         },
 
-        # 🔹 New dedicated logger
+        #  New dedicated logger
         'spam_detection': {
             'handlers': ['spam_file'],
             'level': 'INFO',
@@ -317,5 +317,5 @@ LOGGING = {
         },
     }
 }
-
+SPAM_LOG_FILE = os.getenv("SPAM_LOG_FILE", BASE_DIR / "logs/spam_detection.log")
 VIDEO_PATH = os.getenv("VIDEO_PATH")

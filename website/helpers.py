@@ -212,6 +212,7 @@ def handle_spam(question, user, delete_on_high=True, save_question_metadata_befo
             # delete after logging
             spam_logger.info(f"MARK_INACTIVE: Question {question.id} by user {user.id} score={spam_score}")
             question.status = 0
+            question.save(update_fields=["status"])
             return 'AUTO_DELETE'
         else:
             # hide instead of delete
