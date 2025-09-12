@@ -117,7 +117,7 @@ class SpamLog(models.Model):
         ("APPROVED", "Approved"),
     ]
 
-    #question_id = models.IntegerField()
+    question_id = models.IntegerField()
     user_id = models.IntegerField(null=True, blank=True)
     category = models.CharField(max_length=200, blank=True)
     title = models.CharField(max_length=200, blank=True)
