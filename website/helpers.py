@@ -17,7 +17,7 @@ from .models import SpamRule, SpamLog   # assuming app is `forum`
 sw = stopwords.words('english')
 
 # Configure logging for spam detection
-logging.basicConfig(level=logging.INFO)
+import logging
 spam_logger = logging.getLogger('spam_detection')
 
 
@@ -113,7 +113,7 @@ class SpamQuestionDetector:
     def extract_urls(self, text: str):
         return re.findall(r'https?://[^\s)<>"]+', text)
 
-    def detect_spam(self, title: str, content: str, category: str = "", tutorial: str = "") -> dict:
+    def detect_spam(self,user,question, title: str, content: str, category: str = "", tutorial: str = "") -> dict:
         combined_text = " ".join(filter(None, [title, content, category, tutorial])).lower()
         spam_score = 0
         matches = []
@@ -160,8 +160,10 @@ class SpamQuestionDetector:
         }
 
         # debug log
-        spam_logger.info(f"SpamDetect result: score={spam_score} action={action} matches={len(matches)}")
-
+        spam_logger.info(
+            "SpamDetect result: question_id=%s user_id=%s score=%s action=%s matches=%s",
+            question.id, user.id, spam_score, action, len(matches)
+        )
         return result
 
 
@@ -175,6 +177,8 @@ def handle_spam(question, user, delete_on_high=True, save_question_metadata_befo
     """
     detector = SpamQuestionDetector()
     result = detector.detect_spam(
+        user=user,
+        question=question,
         title=getattr(question, 'title', '') or '',
         content=getattr(question, 'body', '') or '',
         category=getattr(question, 'category', '') or '',
@@ -188,7 +192,7 @@ def handle_spam(question, user, delete_on_high=True, save_question_metadata_befo
 
     # prepare log payload
     log_payload = {
-        #'question_id': question.id,
+        'question_id': question.id,
         'user_id': user.id if user else None,
         'category': getattr(question, 'category', '') or '',
         'title': getattr(question, 'title', '') or '',
@@ -206,8 +210,8 @@ def handle_spam(question, user, delete_on_high=True, save_question_metadata_befo
 
         if delete_on_high:
             # delete after logging
-            spam_logger.info(f"AUTO_DELETE: Question {question.id} by user {user.id} score={spam_score}")
-            question.delete()
+            spam_logger.info(f"MARK_INACTIVE: Question {question.id} by user {user.id} score={spam_score}")
+            question.status = 0
             return 'AUTO_DELETE'
         else:
             # hide instead of delete

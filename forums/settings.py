@@ -267,27 +267,53 @@ try:
 except ImportError:
     pass
 
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
         }
     },
+
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+
     'handlers': {
         'mail_admins': {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler'
-        }
+        },
+
+        # 🔹 New handler for spam detection
+        'spam_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs/spam_detection.log',  # create logs/ dir
+            'maxBytes': 1024 * 1024 * 5,   # 5 MB
+            'backupCount': 5,              # keep 5 old logs
+            'formatter': 'verbose',
+        },
     },
+
     'loggers': {
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
+        },
+
+        # 🔹 New dedicated logger
+        'spam_detection': {
+            'handlers': ['spam_file'],
+            'level': 'INFO',
+            'propagate': False,
         },
     }
 }
