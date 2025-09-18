@@ -17,7 +17,7 @@ from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
 from .sortable import SortableHeader, get_sorted_list, get_field_index
-
+from forums.views import user_logout
 
 User = get_user_model()
 categories = []
@@ -335,7 +335,8 @@ def new_question(request):
             action = handle_spam(question, request.user)
 
             if action == "AUTO_DELETE":
-                messages.error(request, " Your question was removed because it looks like spam.")
+                messages.error(request, " Your question is being marked as spam and your account has been deactivated.")
+                user_logout(request)
                 return HttpResponseRedirect('/')
 
             elif action == "FLAGGED":
