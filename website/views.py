@@ -8,6 +8,7 @@ from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.contrib import messages
 from website.models import Question, Answer, Notification, AnswerComment
 from spoken_auth.models import TutorialDetails, TutorialResources
@@ -18,6 +19,7 @@ from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
 from .sortable import SortableHeader, get_sorted_list, get_field_index
 from forums.views import user_logout
+from website.permissions import is_administrator
 
 User = get_user_model()
 categories = []
@@ -37,7 +39,14 @@ def home(request):
     slider_questions = Question.objects.filter(
             date_created=Subquery(subquery), status=1
     ).order_by('category')
-
+    
+     # Add spam questions only for admin users
+    spam_questions = []
+    is_admin = False
+    if request.user.is_authenticated and is_administrator(request.user):
+        spam_questions = Question.objects.filter(status=2).order_by('-date_created')  # status=2 for spam
+        is_admin = True
+        
     # Mapping of foss name as in spk db & its corresponding category name in forums db
     category_fosses = {val.replace(" ", "-") : val for val in categories}    
 
@@ -62,7 +71,9 @@ def home(request):
     context = {
     'questions': questions,
     'active_questions':active_questions,
-    'category_question_map': category_question_map
+    'category_question_map': category_question_map,
+    'spam_questions': spam_questions,
+    'is_admin': is_admin,
 }
     return render(request, "website/templates/index.html", context)
 

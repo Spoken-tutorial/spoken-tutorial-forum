@@ -93,6 +93,7 @@ $("#activelistTable").tablesorter({
             <ul class="nav nav-tabs">
                 <li class="active"><a data-toggle="tab" href="#recent_question">Recent questions</a></li>
                 <li><a data-toggle="tab" href="#most_active">Most active questions</a></li>
+                <li><a data-toggle="tab" href="#spam_pending">Spam Pending-Approval</a></li>
             </ul>
         </div>
         <div class="panel-body">
@@ -279,7 +280,46 @@ $("#activelistTable").tablesorter({
                         </tbody>
                     </table>
             </div>
-        </div>
+            <div id="spam_pending" class="tab-pane fade">
+                <table id="spamTable" class="tablesorter-blue">
+                    <thead>
+                        <tr>
+                            <th>FOSS</th>
+                            <th>Tutorial</th>
+                            <th>Min</th>
+                            <th>Sec</th>
+                            <th>Question</th>
+                            <th>Date</th>
+                            <th>User</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for question in spam_questions %}
+                        <tr>
+                            <td>{{ question.category|truncatechars:12 }}</td>
+                            <td>{{ question.tutorial|truncatechars:12 }}</td>
+                            <td>{{ question.minute_range }}</td>
+                            <td>{{ question.second_range }}</td>
+                            <td>
+                                <a href="{% url 'website:get_question' question.id %}{% prettify question.title %}">
+                                    {{ question.title|truncatechars:40 }}
+                                </a>
+                            </td>
+                            <td>{{ question.date_created|date:"d-m-y" }}</td>
+                            <td>{{ question.user|truncatechars:10 }}</td>
+                            <td>
+                                <!-- Add approve/reject buttons here if needed -->
+                                <a href="{% url 'website:ajax_question_update' %}?qid={{ question.id }}" class="btn btn-xs btn-success">Approve</a>
+                                <a href="{% url 'website:ajax_delete_question' %}?qid={{ question.id }}" class="btn btn-xs btn-danger">Reject</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8">No spam questions pending approval.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div> <!-- /.panel-body -->
     </div> <!-- /.panel -->
 {% endblock %}
