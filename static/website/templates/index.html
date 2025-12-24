@@ -115,6 +115,7 @@ $("#activelistTable").tablesorter({
 							</thead>
 							<tbody>
                 {% for question in questions %}
+                {% if 'test-' not in question.category %}
                 <tr>
                     <td>
                         <span href="#" class="category" data-toggle="tooltip" data-placement="top" title="{{ question.category}}">
@@ -178,6 +179,7 @@ $("#activelistTable").tablesorter({
                         </span>
                     </td>
                 </tr>
+                {% endif %}
                 {% endfor %}
                 </tbody>
             </table>
@@ -296,7 +298,7 @@ $("#activelistTable").tablesorter({
                     </thead>
                     <tbody>
                         {% for question in spam_questions %}
-                        <tr>
+                        <tr id="spam-row-{{ question.id }}">
                             <td>{{ question.category|truncatechars:12 }}</td>
                             <td>{{ question.tutorial|truncatechars:12 }}</td>
                             <td>{{ question.minute_range }}</td>
@@ -309,9 +311,8 @@ $("#activelistTable").tablesorter({
                             <td>{{ question.date_created|date:"d-m-y" }}</td>
                             <td>{{ question.user|truncatechars:10 }}</td>
                             <td>
-                                <!-- Add approve/reject buttons here if needed -->
-                                <a href="{% url 'website:ajax_question_update' %}?qid={{ question.id }}" class="btn btn-xs btn-success">Approve</a>
-                                <a href="{% url 'website:ajax_delete_question' %}?qid={{ question.id }}" class="btn btn-xs btn-danger">Reject</a>
+                                <button class="btn btn-xs btn-success spam-approve" data-qid="{{ question.id }}">Approve</button>
+                                <button class="btn btn-xs btn-danger spam-reject" data-qid="{{ question.id }}">Reject</button>
                             </td>
                         </tr>
                         {% empty %}
@@ -363,6 +364,41 @@ $("#activelistTable").tablesorter({
                 window.location = "/filter/" + category;
             }
             e.preventDefault();
+        });
+
+        // Spam approval handlers
+        $('.spam-approve').click(function() {
+            var qid = $(this).data('qid');
+            var row = $('#spam-row-' + qid);
+            
+            $.post('/ajax-spam-approve/', {
+                question_id: qid,
+                csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+            }, function(response) {
+                if(response.success) {
+                    row.fadeOut(function() { $(this).remove(); });
+                    alert('Question approved!');
+                } else {
+                    alert('Error approving question: ' + (response.error || 'Unknown error'));
+                }
+            }, 'json');
+        });
+
+        $('.spam-reject').click(function() {
+            var qid = $(this).data('qid');
+            var row = $('#spam-row-' + qid);
+            
+            $.post('/ajax-spam-reject/', {
+                question_id: qid,
+                csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+            }, function(response) {
+                if(response.success) {
+                    row.fadeOut(function() { $(this).remove(); });
+                    alert('Question rejected as spam!');
+                } else {
+                    alert('Error rejecting question: ' + (response.error || 'Unknown error'));
+                }
+            }, 'json');
         });
     });
     $('span').tooltip();

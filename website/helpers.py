@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from website.models import Question, User
+import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from website.templatetags.permission_tags import can_edit, can_hide_delete
@@ -14,7 +15,15 @@ from django.db.models import Q
 import re
 from .models import SpamRule, SpamLog   # assuming app is `forum`
 
-sw = stopwords.words('english')
+def _load_stopwords():
+    try:
+        return stopwords.words('english')
+    except LookupError:
+        nltk.download('stopwords', quiet=True)
+        return stopwords.words('english')
+
+
+sw = _load_stopwords()
 
 # Configure logging for spam detection
 import logging
@@ -209,10 +218,11 @@ def handle_spam(question, user, delete_on_high=True, save_question_metadata_befo
         SpamLog.objects.create(**log_payload)
 
         if delete_on_high:
-            # delete after logging
+            # mark as spam (status=2) after logging
             spam_logger.info(f"MARK_INACTIVE: Question {question.id} by user {user.id} score={spam_score}")
-            question.status = 0
-            question.save(update_fields=["status"])
+            question.status = 2
+            question.spam = True
+            question.save(update_fields=["status", "spam"])
             user.is_active = 0
             user.save(update_fields=["is_active"])
             return 'AUTO_DELETE'

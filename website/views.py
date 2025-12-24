@@ -44,7 +44,10 @@ def home(request):
     spam_questions = []
     is_admin = False
     if request.user.is_authenticated and is_administrator(request.user):
-        spam_questions = Question.objects.filter(status=2).order_by('-date_created')  # status=2 for spam
+        # Show both: status=2 (auto-detected spam) and approval_required=True (flagged for review)
+        spam_questions = Question.objects.filter(
+            Q(status=2) | Q(approval_required=True)
+        ).order_by('-date_created')
         is_admin = True
         
     # Mapping of foss name as in spk db & its corresponding category name in forums db
@@ -749,3 +752,47 @@ def unanswered_notification(request):
     if total_count:
         forums_mail(to, subject, message)
     return HttpResponse(message)
+
+
+@login_required
+def ajax_spam_approve(request):
+    """Admin approves a spam-flagged question"""
+    if request.method == "POST" and is_administrator(request.user):
+        question_id = request.POST.get('question_id')
+        try:
+            question = get_object_or_404(Question, pk=question_id)
+            question.spam = False
+            question.approval_required = False
+            question.status = 1
+            question.save(update_fields=['spam', 'approval_required', 'status'])
+            
+            from website.models import SpamLog
+            SpamLog.objects.filter(question_id=question_id).update(action='APPROVED')
+            
+            return HttpResponse(json.dumps({'success': True}), content_type='application/json')
+        except Exception:
+            pass
+    
+    return HttpResponse(json.dumps({'success': False}), content_type='application/json')
+
+
+@login_required
+def ajax_spam_reject(request):
+    """Admin rejects a spam-flagged question"""
+    if request.method == "POST" and is_administrator(request.user):
+        question_id = request.POST.get('question_id')
+        try:
+            question = get_object_or_404(Question, pk=question_id)
+            question.spam = True
+            question.approval_required = False
+            question.status = 2
+            question.save(update_fields=['spam', 'approval_required', 'status'])
+            
+            from website.models import SpamLog
+            SpamLog.objects.filter(question_id=question_id).update(action='AUTO_DELETE')
+            
+            return HttpResponse(json.dumps({'success': True}), content_type='application/json')
+        except Exception:
+            pass
+    
+    return HttpResponse(json.dumps({'success': False}), content_type='application/json')
