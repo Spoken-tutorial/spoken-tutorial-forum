@@ -19,6 +19,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SPAM_LOG_FILE = os.getenv("SPAM_LOG_FILE")
 
+# reCAPTCHA Settings
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
@@ -109,8 +113,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',  # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
         'NAME': os.getenv("SPOKEN_DB"),                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv("DB_PASSWORD"),
+        'USER': os.getenv("SPOKEN_DB_USER"),
+        'PASSWORD': os.getenv("SPOKEN_DB_PASSWORD"),
         # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'HOST': '',
         'PORT': '',                      # Set to empty string for default.
@@ -151,7 +155,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Calcutta'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 

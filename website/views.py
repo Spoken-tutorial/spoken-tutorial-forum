@@ -1,4 +1,5 @@
 import json
+import requests
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
@@ -332,6 +333,50 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 def new_question(request):
     context = {}
     if request.method == 'POST':
+        # check if user has a role 
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        
+        # only require captcha for users without a role
+        if not user_has_role:
+            
+            recaptcha_response = request.POST.get('g-recaptcha-response', '')
+            
+            if not recaptcha_response:
+                messages.error(request, "Please complete the reCAPTCHA verification.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # verify with google
+            recaptcha_verification_url = "https://www.google.com/recaptcha/api/siteverify"
+            recaptcha_data = {
+                'secret': settings.RECAPTCHA_SECRET_KEY,
+                'response': recaptcha_response
+            }
+            
+            try:
+                recaptcha_result = requests.post(recaptcha_verification_url, data=recaptcha_data, timeout=5)
+                recaptcha_result.raise_for_status()
+                recaptcha_json = recaptcha_result.json()
+            except requests.RequestException as e:
+                messages.error(request, "Error verifying reCAPTCHA. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # check if verification was successful
+            if not recaptcha_json.get('success', False):
+                messages.error(request, "reCAPTCHA verification failed. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                return render(request, 'website/templates/new-question.html', context)
+        
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
@@ -380,12 +425,16 @@ def new_question(request):
                 email.send(fail_silently=True)
                 return HttpResponseRedirect('/')
 
-        # If form not valid → re-render with errors
+        # If form not valid -> re-render with errors
         context['form'] = form
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
         return render(request, 'website/templates/new-question.html', context)
 
     else:
-        # GET request → render empty form
+        # GET request -> render empty form
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
@@ -396,6 +445,10 @@ def new_question(request):
         )
         context['form'] = form
         context['category'] = category
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
         return render(request, 'website/templates/new-question.html', context)
 
 # Notification Section
