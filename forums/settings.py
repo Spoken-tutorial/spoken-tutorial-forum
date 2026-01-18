@@ -17,6 +17,11 @@ import os
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+SPAM_LOG_FILE = os.getenv("SPAM_LOG_FILE")
+
+# reCAPTCHA Settings
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
@@ -108,8 +113,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',  # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
         'NAME': os.getenv("SPOKEN_DB"),                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv("DB_PASSWORD"),
+        'USER': os.getenv("SPOKEN_DB_USER"),
+        'PASSWORD': os.getenv("SPOKEN_DB_PASSWORD"),
         # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'HOST': '',
         'PORT': '',                      # Set to empty string for default.
@@ -150,7 +155,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Calcutta'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
@@ -267,29 +272,54 @@ try:
 except ImportError:
     pass
 
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
         }
     },
+
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+
     'handlers': {
         'mail_admins': {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler'
-        }
+        },
+
+        # New handler for spam detection
+        'spam_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': SPAM_LOG_FILE,  # create logs/ dir
+            'maxBytes': 1024 * 1024 * 5,   # 5 MB
+            'backupCount': 5,              # keep 5 old logs
+            'formatter': 'verbose',
+        },
     },
+
     'loggers': {
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
         },
+
+        #  New dedicated logger
+        'spam_detection': {
+            'handlers': ['spam_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     }
 }
-
 VIDEO_PATH = os.getenv("VIDEO_PATH")

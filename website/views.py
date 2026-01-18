@@ -1,4 +1,5 @@
 import json
+import requests
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
@@ -8,16 +9,18 @@ from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
-
+from django.contrib.auth.models import Group
+from django.contrib import messages
 from website.models import Question, Answer, Notification, AnswerComment
 from spoken_auth.models import TutorialDetails, TutorialResources
 from website.forms import NewQuestionForm, AnswerQuesitionForm
-from website.helpers import get_video_info, prettify, clean_user_data, get_similar_questions
+from website.helpers import get_video_info, prettify,clean_user_data, get_similar_questions, SpamQuestionDetector, handle_spam
 from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
 from spoken_auth.models import FossCategory
 from .sortable import SortableHeader, get_sorted_list, get_field_index
-
+from forums.views import user_logout
+from website.permissions import is_administrator
 
 User = get_user_model()
 categories = []
@@ -37,7 +40,17 @@ def home(request):
     slider_questions = Question.objects.filter(
             date_created=Subquery(subquery), status=1
     ).order_by('category')
-
+    
+     # Add spam questions only for admin users
+    spam_questions = []
+    is_admin = False
+    if request.user.is_authenticated and is_administrator(request.user):
+        # Show both: status=2 (auto-detected spam) and approval_required=True (flagged for review)
+        spam_questions = Question.objects.filter(
+            Q(status=2) | Q(approval_required=True)
+        ).order_by('-date_created')
+        is_admin = True
+        
     # Mapping of foss name as in spk db & its corresponding category name in forums db
     category_fosses = {val.replace(" ", "-") : val for val in categories}    
 
@@ -62,7 +75,9 @@ def home(request):
     context = {
     'questions': questions,
     'active_questions':active_questions,
-    'category_question_map': category_question_map
+    'category_question_map': category_question_map,
+    'spam_questions': spam_questions,
+    'is_admin': is_admin,
 }
     return render(request, "website/templates/index.html", context)
 
@@ -70,9 +85,9 @@ def home(request):
 def questions(request):
     questions = Question.objects.filter(status=1).order_by('category', 'tutorial')
     questions = questions.annotate(total_answers=Count('answer'))
-
+        
     raw_get_data = request.GET.get('o', None)
-
+    
     header = {
                 1: SortableHeader('category', True, 'Foss'),
                 2: SortableHeader('tutorial', True, 'Tutorial Name'),
@@ -318,6 +333,50 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 def new_question(request):
     context = {}
     if request.method == 'POST':
+        # check if user has a role 
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        
+        # only require captcha for users without a role
+        if not user_has_role:
+            
+            recaptcha_response = request.POST.get('g-recaptcha-response', '')
+            
+            if not recaptcha_response:
+                messages.error(request, "Please complete the reCAPTCHA verification.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # verify with google
+            recaptcha_verification_url = "https://www.google.com/recaptcha/api/siteverify"
+            recaptcha_data = {
+                'secret': settings.RECAPTCHA_SECRET_KEY,
+                'response': recaptcha_response
+            }
+            
+            try:
+                recaptcha_result = requests.post(recaptcha_verification_url, data=recaptcha_data, timeout=5)
+                recaptcha_result.raise_for_status()
+                recaptcha_json = recaptcha_result.json()
+            except requests.RequestException as e:
+                messages.error(request, "Error verifying reCAPTCHA. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # check if verification was successful
+            if not recaptcha_json.get('success', False):
+                messages.error(request, "reCAPTCHA verification failed. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                return render(request, 'website/templates/new-question.html', context)
+        
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
@@ -331,47 +390,66 @@ def new_question(request):
             question.body = cleaned_data['body']
             question.views = 1
             question.save()
+            # Run spam detection
+            action = handle_spam(question, request.user)
 
-            # Sending email when a new question is asked
-            subject = 'New Forum Question'
-            message = """
-                The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{0}</b><br>
-                Category: <b>{1}</b><br>
-                Tutorial: <b>{2}</b><br>
-                Link: <a href="{3}">{3}</a><br>
-                Question: <b>{4}</b><br>
-            """.format(
-                question.title,
-                question.category,
-                question.tutorial,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id),
-                question.body
-            )
-            email = EmailMultiAlternatives(
-                subject, '', 'forums',
-                ['team@spoken-tutorial.org', 'team@fossee.in'],
-                headers={"Content-type": "text/html;charset=iso-8859-1"}
-            )
-            email.attach_alternative(message, "text/html")
-            email.send(fail_silently=True)
-            # End of email send
+            if action == "AUTO_DELETE":
+                messages.error(request, " Your question is being marked as spam and your account has been deactivated.")
+                user_logout(request)
+                return HttpResponseRedirect('/')
 
-            return HttpResponseRedirect('/')
+            elif action == "FLAGGED":
+                messages.warning(request, " Your question is pending moderator review.")
+                # Don’t send email for flagged content
+                return HttpResponseRedirect('/')
+
+            else:  # APPROVED
+                
+                subject = 'New Forum Question'
+                message = f"""
+                    The following new question has been posted in the Spoken Tutorial Forum: <br>
+                    Title: <b>{question.title}</b><br>
+                    Category: <b>{question.category}</b><br>
+                    Tutorial: <b>{question.tutorial}</b><br>
+                    Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
+                        http://forums.spoken-tutorial.org/question/{question.id}
+                    </a><br>
+                    Question: <b>{question.body}</b><br>
+                """
+                email = EmailMultiAlternatives(
+                    subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                return HttpResponseRedirect('/')
+
+        # If form not valid -> re-render with errors
+        context['form'] = form
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
+        return render(request, 'website/templates/new-question.html', context)
+
     else:
-        # get values from URL.
+        # GET request -> render empty form
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
         second_range = request.GET.get('second_range', None)
-        # pass minute_range and second_range value to NewQuestionForm to populate on select
-        form = NewQuestionForm(category=category, tutorial=tutorial,
-                               minute_range=minute_range, second_range=second_range)
+        form = NewQuestionForm(
+            category=category, tutorial=tutorial,
+            minute_range=minute_range, second_range=second_range
+        )
+        context['form'] = form
         context['category'] = category
-
-    context['form'] = form
-    context.update(csrf(request))
-    return render(request, 'website/templates/new-question.html', context)
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
+        return render(request, 'website/templates/new-question.html', context)
 
 # Notification Section
 
@@ -727,3 +805,47 @@ def unanswered_notification(request):
     if total_count:
         forums_mail(to, subject, message)
     return HttpResponse(message)
+
+
+@login_required
+def ajax_spam_approve(request):
+    """Admin approves a spam-flagged question"""
+    if request.method == "POST" and is_administrator(request.user):
+        question_id = request.POST.get('question_id')
+        try:
+            question = get_object_or_404(Question, pk=question_id)
+            question.spam = False
+            question.approval_required = False
+            question.status = 1
+            question.save(update_fields=['spam', 'approval_required', 'status'])
+            
+            from website.models import SpamLog
+            SpamLog.objects.filter(question_id=question_id).update(action='APPROVED')
+            
+            return HttpResponse(json.dumps({'success': True}), content_type='application/json')
+        except Exception:
+            pass
+    
+    return HttpResponse(json.dumps({'success': False}), content_type='application/json')
+
+
+@login_required
+def ajax_spam_reject(request):
+    """Admin rejects a spam-flagged question"""
+    if request.method == "POST" and is_administrator(request.user):
+        question_id = request.POST.get('question_id')
+        try:
+            question = get_object_or_404(Question, pk=question_id)
+            question.spam = True
+            question.approval_required = False
+            question.status = 2
+            question.save(update_fields=['spam', 'approval_required', 'status'])
+            
+            from website.models import SpamLog
+            SpamLog.objects.filter(question_id=question_id).update(action='AUTO_DELETE')
+            
+            return HttpResponse(json.dumps({'success': True}), content_type='application/json')
+        except Exception:
+            pass
+    
+    return HttpResponse(json.dumps({'success': False}), content_type='application/json')
