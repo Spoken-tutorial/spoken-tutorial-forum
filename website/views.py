@@ -1,9 +1,11 @@
 import json
+import requests
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
 from django.template.context_processors import csrf
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -318,6 +320,53 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
 def new_question(request):
     context = {}
     if request.method == 'POST':
+        # check if user has a role 
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        
+        # only require captcha for users without a role
+        if not user_has_role:
+            
+            recaptcha_response = request.POST.get('g-recaptcha-response', '')
+            
+            if not recaptcha_response:
+                messages.error(request, "Please complete the reCAPTCHA verification.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                context.update(csrf(request))
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # verify with google
+            recaptcha_verification_url = "https://www.google.com/recaptcha/api/siteverify"
+            recaptcha_data = {
+                'secret': settings.RECAPTCHA_SECRET_KEY,
+                'response': recaptcha_response
+            }
+            
+            try:
+                recaptcha_result = requests.post(recaptcha_verification_url, data=recaptcha_data, timeout=5)
+                recaptcha_result.raise_for_status()
+                recaptcha_json = recaptcha_result.json()
+            except requests.RequestException as e:
+                messages.error(request, "Error verifying reCAPTCHA. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                context.update(csrf(request))
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # check if verification was successful
+            if not recaptcha_json.get('success', False):
+                messages.error(request, "reCAPTCHA verification failed. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                context.update(csrf(request))
+                return render(request, 'website/templates/new-question.html', context)
+        
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
@@ -331,35 +380,52 @@ def new_question(request):
             question.body = cleaned_data['body']
             question.views = 1
             question.save()
+            # Run spam detection
+            action = handle_spam(question, request.user)
 
-            # Sending email when a new question is asked
-            subject = 'New Forum Question'
-            message = """
-                The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{0}</b><br>
-                Category: <b>{1}</b><br>
-                Tutorial: <b>{2}</b><br>
-                Link: <a href="{3}">{3}</a><br>
-                Question: <b>{4}</b><br>
-            """.format(
-                question.title,
-                question.category,
-                question.tutorial,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id),
-                question.body
-            )
-            email = EmailMultiAlternatives(
-                subject, '', 'forums',
-                ['team@spoken-tutorial.org', 'team@fossee.in'],
-                headers={"Content-type": "text/html;charset=iso-8859-1"}
-            )
-            email.attach_alternative(message, "text/html")
-            email.send(fail_silently=True)
-            # End of email send
+            if action == "AUTO_DELETE":
+                messages.error(request, " Your question is being marked as spam and your account has been deactivated.")
+                user_logout(request)
+                return HttpResponseRedirect('/')
 
-            return HttpResponseRedirect('/')
+            elif action == "FLAGGED":
+                messages.warning(request, " Your question is pending moderator review.")
+                # Don’t send email for flagged content
+                return HttpResponseRedirect('/')
+
+            else:  # APPROVED
+                
+                subject = 'New Forum Question'
+                message = f"""
+                    The following new question has been posted in the Spoken Tutorial Forum: <br>
+                    Title: <b>{question.title}</b><br>
+                    Category: <b>{question.category}</b><br>
+                    Tutorial: <b>{question.tutorial}</b><br>
+                    Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
+                        http://forums.spoken-tutorial.org/question/{question.id}
+                    </a><br>
+                    Question: <b>{question.body}</b><br>
+                """
+                email = EmailMultiAlternatives(
+                    subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
+                return HttpResponseRedirect('/')
+
+        # If form not valid -> re-render with errors
+        context['form'] = form
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
+        context.update(csrf(request))
+        return render(request, 'website/templates/new-question.html', context)
+
     else:
-        # get values from URL.
+        # GET request -> render empty form
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
@@ -368,10 +434,13 @@ def new_question(request):
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
         context['category'] = category
-
-    context['form'] = form
-    context.update(csrf(request))
-    return render(request, 'website/templates/new-question.html', context)
+        context['form'] = form
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
+        context.update(csrf(request))
+        return render(request, 'website/templates/new-question.html', context)
 
 # Notification Section
 
