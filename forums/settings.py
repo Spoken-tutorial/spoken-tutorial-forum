@@ -113,8 +113,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',  # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
         'NAME': os.getenv("SPOKEN_DB"),                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
-        'USER': os.getenv("SPOKEN_DB_USER"),
-        'PASSWORD': os.getenv("SPOKEN_DB_PASSWORD"),
+        'USER': os.getenv("DB_USER"),
+        'PASSWORD': os.getenv("DB_PASSWORD"),
         # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'HOST': '',
         'PORT': '',                      # Set to empty string for default.
@@ -155,7 +155,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = 'Asia/Calcutta'
 
 USE_I18N = True
 
@@ -244,7 +244,7 @@ COMPRESS_CSS_FILTERS = (
 
 COMPRESS_ENABLED = True
 
-# HTML_MINIFY = True
+HTML_MINIFY = True
 RECAPTCHA_PUBLIC_KEY = '6Le8qf8SAAAAABV9wYBW99Jotv-EygJXIhMa_n54'
 RECAPTCHA_PRIVATE_KEY = '6Le8qf8SAAAAAF9CkucURPapw2vaDPrU4qMzfg73'
 
@@ -259,7 +259,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'htmlmin.middleware.HtmlMinifyMiddleware',
+    'htmlmin.middleware.HtmlMinifyMiddleware',
     'htmlmin.middleware.MarkRequestMiddleware',
 ]
 
