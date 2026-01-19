@@ -1,9 +1,11 @@
 import json
+import requests
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
 from django.template.context_processors import csrf
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -15,9 +17,10 @@ from website.forms import NewQuestionForm, AnswerQuesitionForm
 from website.helpers import get_video_info, prettify, clean_user_data, get_similar_questions
 from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
-from spoken_auth.models import FossCategory
+from spoken_auth.models import FossCategory, Participant
 from .sortable import SortableHeader, get_sorted_list, get_field_index
-
+from forums.views import user_logout
+from website.permissions import is_administrator, is_forumsadmin
 
 User = get_user_model()
 categories = []
@@ -57,12 +60,17 @@ def home(request):
         if foss not in category_question_map:
             category_question_map[foss] = None
     
+    # spam questions
+    spam_questions = Question.objects.filter(status=2).order_by('last_active').reverse()[:100]
     # Sort category_question_map by category name
     category_question_map = dict(sorted(category_question_map.items(), key= lambda item: item[0].lower()))
+    show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
     context = {
     'questions': questions,
     'active_questions':active_questions,
-    'category_question_map': category_question_map
+    'spam_questions': spam_questions,
+    'category_question_map': category_question_map,
+    'show_spam_list': show_spam_list
 }
     return render(request, "website/templates/index.html", context)
 
@@ -128,13 +136,23 @@ def get_question(request, question_id=None, pretty_url=None):
         return HttpResponseRedirect('/question/' + question_id + '/' + pretty_title)
     answers = question.answer_set.all()
     form = AnswerQuesitionForm()
+    if question.status in (0,2):
+        label = "Show"
+    else:
+        label = "Hide"
+    
     context = {
         'question': question,
         'answers': answers,
         'category': category,
-        'form': form
+        'form': form,
+        'label': label
     }
+    user_has_role = has_role(request.user)
+    context['require_recaptcha'] = not user_has_role
+    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
     context.update(csrf(request))
+    
     # updating views count
     question.views += 1
     question.save()
@@ -145,8 +163,55 @@ def get_question(request, question_id=None, pretty_url=None):
 def question_answer(request):
     if request.method == 'POST':
         form = AnswerQuesitionForm(request.POST)
+        context = {}
         if form.is_valid():
             cleaned_data = form.cleaned_data
+            qid = cleaned_data['question']
+            user_has_role = has_role(request.user)
+            # only require captcha for users without a role
+            if not user_has_role:
+                recaptcha_response = request.POST.get('g-recaptcha-response', '')
+                if not recaptcha_response:
+                    messages.error(request, "Please complete the reCAPTCHA verification.")
+                    form = NewQuestionForm(request.POST)
+                    context['form'] = form
+                    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                    context['require_recaptcha'] = True
+                    context.update(csrf(request))
+                    # return render(request, 'website/templates/new-question.html', context)
+                    return HttpResponseRedirect('/question/' + str(qid))
+                # verify with google
+                recaptcha_verification_url = "https://www.google.com/recaptcha/api/siteverify"
+                recaptcha_data = {
+                    'secret': settings.RECAPTCHA_SECRET_KEY,
+                    'response': recaptcha_response
+                }
+                try:
+                    recaptcha_result = requests.post(recaptcha_verification_url, data=recaptcha_data, timeout=5)
+                    recaptcha_result.raise_for_status()
+                    recaptcha_json = recaptcha_result.json()
+                except requests.RequestException as e:
+                    messages.error(request, "Error verifying reCAPTCHA. Please try again.")
+                    form = NewQuestionForm(request.POST)
+                    context['form'] = form
+                    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                    context['require_recaptcha'] = True
+                    context.update(csrf(request))
+                    messages.error(request, "Error")
+                    # return render(request, 'website/templates/new-question.html', context)
+                    return HttpResponseRedirect('/question/' + str(qid))
+                # check if verification was successful
+                if not recaptcha_json.get('success', False):
+                    messages.error(request, "reCAPTCHA verification failed. Please try again.")
+                    form = NewQuestionForm(request.POST)
+                    context['form'] = form
+                    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                    context['require_recaptcha'] = True
+                    context.update(csrf(request))
+                    messages.error(request, "Error")
+                    # return render(request, 'website/templates/new-question.html', context)
+                    return HttpResponseRedirect('/question/' + str(qid))
+            
             qid = cleaned_data['question']
             body = cleaned_data['body']
             question = get_object_or_404(Question, id=qid)
@@ -313,11 +378,64 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
         }
     return render(request, 'website/templates/filter.html', context)
 
+def has_role(user):
+    flag = user.is_authenticated and user.groups.exists()
+    if not flag:
+        flag = Participant.objects.filter(user_id=user.id).exists()
+    return flag
 
 @login_required
 def new_question(request):
     context = {}
     if request.method == 'POST':
+        # check if user has a role 
+        # user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        user_has_role = has_role(request.user)
+        
+        # only require captcha for users without a role
+        if not user_has_role:
+            
+            recaptcha_response = request.POST.get('g-recaptcha-response', '')
+            
+            if not recaptcha_response:
+                messages.error(request, "Please complete the reCAPTCHA verification.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                context.update(csrf(request))
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # verify with google
+            recaptcha_verification_url = "https://www.google.com/recaptcha/api/siteverify"
+            recaptcha_data = {
+                'secret': settings.RECAPTCHA_SECRET_KEY,
+                'response': recaptcha_response
+            }
+            
+            try:
+                recaptcha_result = requests.post(recaptcha_verification_url, data=recaptcha_data, timeout=5)
+                recaptcha_result.raise_for_status()
+                recaptcha_json = recaptcha_result.json()
+            except requests.RequestException as e:
+                messages.error(request, "Error verifying reCAPTCHA. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                context.update(csrf(request))
+                return render(request, 'website/templates/new-question.html', context)
+            
+            # check if verification was successful
+            if not recaptcha_json.get('success', False):
+                messages.error(request, "reCAPTCHA verification failed. Please try again.")
+                form = NewQuestionForm(request.POST)
+                context['form'] = form
+                context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                context['require_recaptcha'] = True
+                context.update(csrf(request))
+                return render(request, 'website/templates/new-question.html', context)
+        
         form = NewQuestionForm(request.POST)
         if form.is_valid():
             cleaned_data = form.cleaned_data
@@ -330,24 +448,21 @@ def new_question(request):
             question.title = cleaned_data['title']
             question.body = cleaned_data['body']
             question.views = 1
-            question.save()
+            if not user_has_role:
+                question.status = 2 # mark as spam by default for non verified users
 
-            # Sending email when a new question is asked
+            question.save()
             subject = 'New Forum Question'
-            message = """
+            message = f"""
                 The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{0}</b><br>
-                Category: <b>{1}</b><br>
-                Tutorial: <b>{2}</b><br>
-                Link: <a href="{3}">{3}</a><br>
-                Question: <b>{4}</b><br>
-            """.format(
-                question.title,
-                question.category,
-                question.tutorial,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id),
-                question.body
-            )
+                Title: <b>{question.title}</b><br>
+                Category: <b>{question.category}</b><br>
+                Tutorial: <b>{question.tutorial}</b><br>
+                Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
+                    http://forums.spoken-tutorial.org/question/{question.id}
+                </a><br>
+                Question: <b>{question.body}</b><br>
+            """
             email = EmailMultiAlternatives(
                 subject, '', 'forums',
                 ['team@spoken-tutorial.org', 'team@fossee.in'],
@@ -355,11 +470,19 @@ def new_question(request):
             )
             email.attach_alternative(message, "text/html")
             email.send(fail_silently=True)
-            # End of email send
-
             return HttpResponseRedirect('/')
+
+        # If form not valid -> re-render with errors
+        context['form'] = form
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        context['require_recaptcha'] = not user_has_role
+        context.update(csrf(request))
+        return render(request, 'website/templates/new-question.html', context)
+
     else:
-        # get values from URL.
+        # GET request -> render empty form
         category = request.GET.get('category', None)
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
@@ -368,10 +491,14 @@ def new_question(request):
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
         context['category'] = category
-
-    context['form'] = form
-    context.update(csrf(request))
-    return render(request, 'website/templates/new-question.html', context)
+        context['form'] = form
+        context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+        # check if user needs to complete captcha
+        # user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        user_has_role = has_role(request.user)
+        context['require_recaptcha'] = not user_has_role
+        context.update(csrf(request))
+        return render(request, 'website/templates/new-question.html', context)
 
 # Notification Section
 
@@ -627,11 +754,12 @@ def ajax_hide_question(request):
         question = get_object_or_404(Question, pk=key)
         if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.status = 0
-            if request.POST['status'] == '0':
+            if request.POST['status'] in ('0', '2'):
                 question.status = 1
             question.save()
             result = True
-    return HttpResponse(json.dumps(result), mimetype='application/json')
+    # return HttpResponse(json.dumps(result), mimetype='application/json')
+    return HttpResponse(json.dumps(result))
 
 
 def ajax_keyword_search(request):

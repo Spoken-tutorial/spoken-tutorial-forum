@@ -356,7 +356,7 @@ $(document).ready(function() {
     /* hide */
     $('.hide-question').on('click', function(e){
         question_id = parseInt($('.hide-question').data("qid"));
-        status = parseInt($('.hide-question').data("status"));
+        s = parseInt($('.hide-question').data("status"));
         $('#confirm-hide').modal({ backdrop: 'static', keyboard: false })
         .one('click', '#chide', function() {
             $.ajax({
@@ -364,10 +364,11 @@ $(document).ready(function() {
                 type: "POST",
                 data: {
                     question_id: question_id,
-                    status : status,
+                    status : s,
                     
                 },
                 success: function(data) {
+                    $('.hide-question').hide();
                     $hide_qmsg.hide();
                     $hide_qmsg.show();
                     $hide_qmsg.fadeOut(10000);
