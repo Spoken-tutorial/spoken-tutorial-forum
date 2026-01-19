@@ -140,6 +140,7 @@ def get_question(request, question_id=None, pretty_url=None):
         label = "Show"
     else:
         label = "Hide"
+    
     context = {
         'question': question,
         'answers': answers,
@@ -147,6 +148,9 @@ def get_question(request, question_id=None, pretty_url=None):
         'form': form,
         'label': label
     }
+    user_has_role = has_role(request.user)
+    context['require_recaptcha'] = not user_has_role
+    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
     context.update(csrf(request))
     
     # updating views count
@@ -159,8 +163,55 @@ def get_question(request, question_id=None, pretty_url=None):
 def question_answer(request):
     if request.method == 'POST':
         form = AnswerQuesitionForm(request.POST)
+        context = {}
         if form.is_valid():
             cleaned_data = form.cleaned_data
+            qid = cleaned_data['question']
+            user_has_role = has_role(request.user)
+            # only require captcha for users without a role
+            if not user_has_role:
+                recaptcha_response = request.POST.get('g-recaptcha-response', '')
+                if not recaptcha_response:
+                    messages.error(request, "Please complete the reCAPTCHA verification.")
+                    form = NewQuestionForm(request.POST)
+                    context['form'] = form
+                    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                    context['require_recaptcha'] = True
+                    context.update(csrf(request))
+                    # return render(request, 'website/templates/new-question.html', context)
+                    return HttpResponseRedirect('/question/' + str(qid))
+                # verify with google
+                recaptcha_verification_url = "https://www.google.com/recaptcha/api/siteverify"
+                recaptcha_data = {
+                    'secret': settings.RECAPTCHA_SECRET_KEY,
+                    'response': recaptcha_response
+                }
+                try:
+                    recaptcha_result = requests.post(recaptcha_verification_url, data=recaptcha_data, timeout=5)
+                    recaptcha_result.raise_for_status()
+                    recaptcha_json = recaptcha_result.json()
+                except requests.RequestException as e:
+                    messages.error(request, "Error verifying reCAPTCHA. Please try again.")
+                    form = NewQuestionForm(request.POST)
+                    context['form'] = form
+                    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                    context['require_recaptcha'] = True
+                    context.update(csrf(request))
+                    messages.error(request, "Error")
+                    # return render(request, 'website/templates/new-question.html', context)
+                    return HttpResponseRedirect('/question/' + str(qid))
+                # check if verification was successful
+                if not recaptcha_json.get('success', False):
+                    messages.error(request, "reCAPTCHA verification failed. Please try again.")
+                    form = NewQuestionForm(request.POST)
+                    context['form'] = form
+                    context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
+                    context['require_recaptcha'] = True
+                    context.update(csrf(request))
+                    messages.error(request, "Error")
+                    # return render(request, 'website/templates/new-question.html', context)
+                    return HttpResponseRedirect('/question/' + str(qid))
+            
             qid = cleaned_data['question']
             body = cleaned_data['body']
             question = get_object_or_404(Question, id=qid)

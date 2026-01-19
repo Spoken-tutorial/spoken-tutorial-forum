@@ -2,6 +2,13 @@
 {% load static %}
 {% load widget_tweaks %}
 {% block content %}
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }} alert alert-info">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
     <h4>
         <span class="glyphicon glyphicon-pencil">
         </span> Create a new question . . .

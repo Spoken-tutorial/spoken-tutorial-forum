@@ -9,6 +9,14 @@
     {{ question.category }} - {{ question.title }} - Spoken Tutorial Forums
 {% endblock %}
 {% block content %}
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }} alert alert-info">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 <span class="saving hideme">saving . . .</span>
 <span class="saved hideme">saved</span>
 <span class="deleted hideme">{{ question.title }} has been deleted.</span>
@@ -247,6 +255,11 @@
                 </div>
             </div>
         {% endwith %}
+        {% if require_recaptcha %}
+            <div class="form-group" style="margin-top: 20px; margin-bottom: 15px;">
+                <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+            </div>        
+        {% endif %}
         <input class="btn btn-sm btn-info" type="submit" value="Submit Answer">
     </form>
 {% else %}
@@ -312,6 +325,7 @@
     </div><!-- /.modal -->
 
 <script src="{% static 'website/js/nicEdit.js' %}" type="text/javascript"></script>
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <script type="text/javascript">
     bkLib.onDomLoaded(function() {
         new nicEditor({
