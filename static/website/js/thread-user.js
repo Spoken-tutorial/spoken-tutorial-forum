@@ -372,7 +372,7 @@ $(document).ready(function() {
                     $hide_qmsg.hide();
                     $hide_qmsg.show();
                     $hide_qmsg.fadeOut(10000);
-                    // window.location.reload();
+                    window.location.reload();
                 }
             });
         });
