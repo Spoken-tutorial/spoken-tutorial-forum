@@ -17,9 +17,10 @@ from website.forms import NewQuestionForm, AnswerQuesitionForm
 from website.helpers import get_video_info, prettify, clean_user_data, get_similar_questions
 from django.conf  import settings
 from website.templatetags.permission_tags import can_edit, can_hide_delete
-from spoken_auth.models import FossCategory
+from spoken_auth.models import FossCategory, Participant
 from .sortable import SortableHeader, get_sorted_list, get_field_index
-
+from forums.views import user_logout
+from website.permissions import is_administrator, is_forumsadmin
 
 User = get_user_model()
 categories = []
@@ -59,12 +60,17 @@ def home(request):
         if foss not in category_question_map:
             category_question_map[foss] = None
     
+    # spam questions
+    spam_questions = Question.objects.filter(status=2).order_by('last_active').reverse()[:100]
     # Sort category_question_map by category name
     category_question_map = dict(sorted(category_question_map.items(), key= lambda item: item[0].lower()))
+    show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
     context = {
     'questions': questions,
     'active_questions':active_questions,
-    'category_question_map': category_question_map
+    'spam_questions': spam_questions,
+    'category_question_map': category_question_map,
+    'show_spam_list': show_spam_list
 }
     return render(request, "website/templates/index.html", context)
 
@@ -130,13 +136,19 @@ def get_question(request, question_id=None, pretty_url=None):
         return HttpResponseRedirect('/question/' + question_id + '/' + pretty_title)
     answers = question.answer_set.all()
     form = AnswerQuesitionForm()
+    if question.status in (0,2):
+        label = "Show"
+    else:
+        label = "Hide"
     context = {
         'question': question,
         'answers': answers,
         'category': category,
-        'form': form
+        'form': form,
+        'label': label
     }
     context.update(csrf(request))
+    
     # updating views count
     question.views += 1
     question.save()
@@ -315,13 +327,19 @@ def filter(request, category=None, tutorial=None, minute_range=None, second_rang
         }
     return render(request, 'website/templates/filter.html', context)
 
+def has_role(user):
+    flag = user.is_authenticated and user.groups.exists()
+    if not flag:
+        flag = Participant.objects.filter(user_id=user.id).exists()
+    return flag
 
 @login_required
 def new_question(request):
     context = {}
     if request.method == 'POST':
         # check if user has a role 
-        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        # user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        user_has_role = has_role(request.user)
         
         # only require captcha for users without a role
         if not user_has_role:
@@ -379,41 +397,29 @@ def new_question(request):
             question.title = cleaned_data['title']
             question.body = cleaned_data['body']
             question.views = 1
+            if not user_has_role:
+                question.status = 2 # mark as spam by default for non verified users
+
             question.save()
-            # Run spam detection
-            action = handle_spam(question, request.user)
-
-            if action == "AUTO_DELETE":
-                messages.error(request, " Your question is being marked as spam and your account has been deactivated.")
-                user_logout(request)
-                return HttpResponseRedirect('/')
-
-            elif action == "FLAGGED":
-                messages.warning(request, " Your question is pending moderator review.")
-                # Don’t send email for flagged content
-                return HttpResponseRedirect('/')
-
-            else:  # APPROVED
-                
-                subject = 'New Forum Question'
-                message = f"""
-                    The following new question has been posted in the Spoken Tutorial Forum: <br>
-                    Title: <b>{question.title}</b><br>
-                    Category: <b>{question.category}</b><br>
-                    Tutorial: <b>{question.tutorial}</b><br>
-                    Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
-                        http://forums.spoken-tutorial.org/question/{question.id}
-                    </a><br>
-                    Question: <b>{question.body}</b><br>
-                """
-                email = EmailMultiAlternatives(
-                    subject, '', 'forums',
-                    ['team@spoken-tutorial.org', 'team@fossee.in'],
-                    headers={"Content-type": "text/html;charset=iso-8859-1"}
-                )
-                email.attach_alternative(message, "text/html")
-                email.send(fail_silently=True)
-                return HttpResponseRedirect('/')
+            subject = 'New Forum Question'
+            message = f"""
+                The following new question has been posted in the Spoken Tutorial Forum: <br>
+                Title: <b>{question.title}</b><br>
+                Category: <b>{question.category}</b><br>
+                Tutorial: <b>{question.tutorial}</b><br>
+                Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
+                    http://forums.spoken-tutorial.org/question/{question.id}
+                </a><br>
+                Question: <b>{question.body}</b><br>
+            """
+            email = EmailMultiAlternatives(
+                subject, '', 'forums',
+                ['team@spoken-tutorial.org', 'team@fossee.in'],
+                headers={"Content-type": "text/html;charset=iso-8859-1"}
+            )
+            email.attach_alternative(message, "text/html")
+            email.send(fail_silently=True)
+            return HttpResponseRedirect('/')
 
         # If form not valid -> re-render with errors
         context['form'] = form
@@ -437,7 +443,8 @@ def new_question(request):
         context['form'] = form
         context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
         # check if user needs to complete captcha
-        user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        # user_has_role = request.user.is_authenticated and request.user.groups.exists()
+        user_has_role = has_role(request.user)
         context['require_recaptcha'] = not user_has_role
         context.update(csrf(request))
         return render(request, 'website/templates/new-question.html', context)
@@ -696,11 +703,12 @@ def ajax_hide_question(request):
         question = get_object_or_404(Question, pk=key)
         if can_edit(user=request.user, obj=question) or can_hide_delete(user=request.user, obj=question):
             question.status = 0
-            if request.POST['status'] == '0':
+            if request.POST['status'] in ('0', '2'):
                 question.status = 1
             question.save()
             result = True
-    return HttpResponse(json.dumps(result), mimetype='application/json')
+    # return HttpResponse(json.dumps(result), mimetype='application/json')
+    return HttpResponse(json.dumps(result))
 
 
 def ajax_keyword_search(request):

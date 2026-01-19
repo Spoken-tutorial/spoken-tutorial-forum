@@ -82,3 +82,11 @@ class TutorialResources(models.Model):
 
     class Meta:
         db_table = 'creation_tutorialresource'
+
+class Participant(models.Model):
+    id = models.IntegerField(primary_key=True)
+    email = models.EmailField(max_length=255,null=True)
+    user = models.ForeignKey(Users, on_delete=models.PROTECT)
+
+    class Meta:
+        db_table = 'training_participant'

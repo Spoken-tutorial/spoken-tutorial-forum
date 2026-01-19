@@ -14,6 +14,7 @@
 <span class="deleted hideme">{{ question.title }} has been deleted.</span>
 <span class="hide-qmsg hideme">{{ question.title }} has been {% if question.status == 1 %} hidden {% else %} Shown {% endif %}.</span>
 
+
 <div class="row">
     <div class="question-wrapper col-lg-12 col-md-12 col-sm-12 col-xs-12">
     <div class="question {% if user|can_edit:question or user|can_hide_delete:question %}editable{% endif %}">
@@ -71,7 +72,7 @@
         <span class="modify question-midify">
             {% if user|can_edit:question or user|can_hide_delete:question  %}
            
-                    <a class="hide-question btn btn-xs btn-info" data-qid="{{ question.id }}" data-status="{{ question.status }} href="#">{% if question.status == 1 %} Hide {% else %} Show {% endif %}</a>
+                    <a class="hide-question btn btn-xs btn-info" data-qid="{{ question.id }}" data-status="{{ question.status }} href="#">{{ label }}</a>
                     <a class="delete-question btn btn-xs btn-info" data-qid="{{ question.id }}" href="#">Delete</a> 
                 <a class="edit btn btn-xs btn-info" href="#">Edit</a>
                 <a class="save btn btn-xs btn-success" data-qid="{{ question.id }}" href="#">Save</a>
@@ -110,7 +111,7 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-body">
-                        Are you sure want to {% if question.status %} Hide {% else %} Show {% endif %} this question?
+                        Are you sure want to {{ label }} this question?
                     </div>
                     <div class="modal-footer">
                         <button type="button" data-dismiss="modal" class="btn btn-primary btn-sm" id="chide">Yes</button>
