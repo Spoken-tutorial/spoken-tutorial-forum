@@ -227,31 +227,37 @@ def question_answer(request):
                 notification.qid = qid
                 notification.aid = answer.id
                 notification.save()
-
                 user = User.objects.get(id=question.uid)
-                # Sending email when an answer is posted
-                subject = 'Question has been answered'
-                message = """
-                    Dear {0}<br><br>
-                    Your question titled <b>"{1}"</b> has been answered.<br>
-                    Link: {2}<br><br>
-                    Regards,<br>
-                    Spoken Tutorial Forums
-                """.format(
-                    user.username,
-                    question.title,
-                    'http://forums.spoken-tutorial.org/question/' + str(question.id) + "#answer" + str(answer.id)
-                )
+                
+                # Sending email when an answer is posted and user answering the question has verified role in spoken
+                try:
+                    ans_user = User.objects.get(id=answer.uid)
+                    user_has_role = has_role(ans_user)
+                    if user_has_role:
+                        subject = 'Question has been answered'
+                        message = """
+                            Dear {0}<br><br>
+                            Your question titled <b>"{1}"</b> has been answered.<br>
+                            Link: {2}<br><br>
+                            Regards,<br>
+                            Spoken Tutorial Forums
+                        """.format(
+                            user.username,
+                            question.title,
+                            'http://forums.spoken-tutorial.org/question/' + str(question.id) + "#answer" + str(answer.id)
+                        )
 
-                email = EmailMultiAlternatives(
-                    subject, '', 'forums',
-                    [user.email],
-                    headers={"Content-type": "text/html;charset=iso-8859-1"}
-                )
+                        email = EmailMultiAlternatives(
+                            subject, '', 'forums',
+                            [user.email],
+                            headers={"Content-type": "text/html;charset=iso-8859-1"}
+                        )
 
-                email.attach_alternative(message, "text/html")
-                email.send(fail_silently=True)
-                # End of email send
+                        email.attach_alternative(message, "text/html")
+                        email.send(fail_silently=True)
+                        # End of email send
+                except User.DoesNotExist as e:
+                    pass
             return HttpResponseRedirect('/question/' + str(qid) + "#answer" + str(answer.id))
     return HttpResponseRedirect('/')
 
@@ -452,24 +458,26 @@ def new_question(request):
                 question.status = 2 # mark as spam by default for non verified users
 
             question.save()
-            subject = 'New Forum Question'
-            message = f"""
-                The following new question has been posted in the Spoken Tutorial Forum: <br>
-                Title: <b>{question.title}</b><br>
-                Category: <b>{question.category}</b><br>
-                Tutorial: <b>{question.tutorial}</b><br>
-                Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
-                    http://forums.spoken-tutorial.org/question/{question.id}
-                </a><br>
-                Question: <b>{question.body}</b><br>
-            """
-            email = EmailMultiAlternatives(
-                subject, '', 'forums',
-                ['team@spoken-tutorial.org', 'team@fossee.in'],
-                headers={"Content-type": "text/html;charset=iso-8859-1"}
-            )
-            email.attach_alternative(message, "text/html")
-            email.send(fail_silently=True)
+            #send update mail only for verified users, to avoid spam mail
+            if user_has_role:
+                subject = 'New Forum Question'
+                message = f"""
+                    The following new question has been posted in the Spoken Tutorial Forum: <br>
+                    Title: <b>{question.title}</b><br>
+                    Category: <b>{question.category}</b><br>
+                    Tutorial: <b>{question.tutorial}</b><br>
+                    Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
+                        http://forums.spoken-tutorial.org/question/{question.id}
+                    </a><br>
+                    Question: <b>{question.body}</b><br>
+                """
+                email = EmailMultiAlternatives(
+                    subject, '', 'forums',
+                    ['team@spoken-tutorial.org', 'team@fossee.in'],
+                    headers={"Content-type": "text/html;charset=iso-8859-1"}
+                )
+                email.attach_alternative(message, "text/html")
+                email.send(fail_silently=True)
             return HttpResponseRedirect('/')
 
         # If form not valid -> re-render with errors
@@ -829,7 +837,7 @@ def forums_mail(to='', subject='', message=''):
 
 
 def unanswered_notification(request):
-    questions = Question.objects.all()
+    questions = Question.objects.filter(status=1)
     total_count = 0
     message = """
         The following questions are left unanswered.
