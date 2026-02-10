@@ -327,7 +327,7 @@ def answer_comment(request):
             forums_mail(user.email, subject, message)
     return HttpResponseRedirect("/question/" + str(answer.question.id) + "#")
 
-
+@login_required
 def filter(request, category=None, tutorial=None, minute_range=None, second_range=None):
     context = {
         'category': category,
