@@ -169,12 +169,12 @@ $("#activelistTable").tablesorter({
                     </td>
                     
                     <td>
-                        {{ question.answer_set.count }}
+                        {{ question.answer_count }}
                     </td>
                    
                     <td>
-                        <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
-                            {{ question.user|truncatechars:10 }}
+                        <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.cached_user }}">
+                            {{ question.cached_user|truncatechars:10 }}
                         </span>
                     </td>
                 </tr>
@@ -250,8 +250,8 @@ $("#activelistTable").tablesorter({
                                 </span>
                             </td>
                             <td>
-                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
-                                    {{ question.user|truncatechars:10 }}
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.cached_user }}">
+                                    {{ question.cached_user|truncatechars:10 }}
                                 </span>
                             </td>
                             
@@ -263,8 +263,8 @@ $("#activelistTable").tablesorter({
                                 </span>
                             </td>
                             <td>
-                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.last_post_user }}">
-                                    {{ question.last_post_user|truncatechars:10 }}
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.cached_last_post_user }}">
+                                    {{ question.cached_last_post_user|truncatechars:10 }}
                                 </span>
                             </td>
                             
@@ -273,7 +273,7 @@ $("#activelistTable").tablesorter({
                             </td>
                             
                             <td>
-                                {{ question.answer_set.count }}
+                                {{ question.answer_count }}
                             </td>
                         </tr>
                         {% endfor %}
@@ -350,8 +350,8 @@ $("#activelistTable").tablesorter({
                                 </span>
                             </td>
                             <td>
-                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
-                                    {{ question.user|truncatechars:10 }}
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.cached_user }}">
+                                    {{ question.cached_user|truncatechars:10 }}
                                 </span>
                             </td>
                             
@@ -363,8 +363,8 @@ $("#activelistTable").tablesorter({
                                 </span>
                             </td>
                             <td>
-                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.last_post_user }}">
-                                    {{ question.last_post_user|truncatechars:10 }}
+                                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.cached_last_post_user }}">
+                                    {{ question.cached_last_post_user|truncatechars:10 }}
                                 </span>
                             </td>
                             
@@ -373,7 +373,7 @@ $("#activelistTable").tablesorter({
                             </td>
                             
                             <td>
-                                {{ question.answer_set.count }}
+                                {{ question.answer_count }}
                             </td>
                         </tr>
                         {% endfor %}
