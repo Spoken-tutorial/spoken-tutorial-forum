@@ -32,14 +32,35 @@ for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
 
 
 def home(request):
-    questions = Question.objects.filter(status=1).order_by('date_created').reverse()[:100]
-    active_questions = Question.objects.filter(status=1, last_active__isnull=False).order_by('last_active').reverse()[:100]
-
+    # Base query with answer count annotation
+    base_queryset = Question.objects.annotate(answer_count=Count('answer'))
+    
+    questions = base_queryset.filter(status=1).order_by('-date_created')[:100]
+    active_questions = base_queryset.filter(status=1, last_active__isnull=False).order_by('-last_active')[:100]
+    
     # Retrieve latest questions per category for the slider
     subquery = Question.objects.filter(category=OuterRef('category'), status=1).values('category').annotate(max_date=Max('date_created')).values('max_date')
-    slider_questions = Question.objects.filter(
+    slider_questions = base_queryset.filter(
             date_created=Subquery(subquery), status=1
     ).order_by('category')
+    
+    # spam questions
+    spam_questions = base_queryset.filter(status=2).order_by('-last_active')[:100]
+
+    # Bulk fetch users for all displayed questions to avoid N+1
+    all_questions = list(questions) + list(active_questions) + list(slider_questions) + list(spam_questions)
+    uids = set()
+    for q in all_questions:
+        uids.add(q.uid)
+        if q.last_post_by:
+            uids.add(q.last_post_by)
+    
+    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+    
+    # Attach usernames to question objects so templates don't trigger queries
+    for q in all_questions:
+        q.cached_user = users.get(q.uid, "Unknown User")
+        q.cached_last_post_user = users.get(q.last_post_by, "Unknown User") if q.last_post_by else "Unknown User"
 
     # Mapping of foss name as in spk db & its corresponding category name in forums db
     category_fosses = {val.replace(" ", "-") : val for val in categories}    
@@ -60,18 +81,17 @@ def home(request):
         if foss not in category_question_map:
             category_question_map[foss] = None
     
-    # spam questions
-    spam_questions = Question.objects.filter(status=2).order_by('last_active').reverse()[:100]
     # Sort category_question_map by category name
     category_question_map = dict(sorted(category_question_map.items(), key= lambda item: item[0].lower()))
     show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
+    
     context = {
-    'questions': questions,
-    'active_questions':active_questions,
-    'spam_questions': spam_questions,
-    'category_question_map': category_question_map,
-    'show_spam_list': show_spam_list
-}
+        'questions': questions,
+        'active_questions': active_questions,
+        'spam_questions': spam_questions,
+        'category_question_map': category_question_map,
+        'show_spam_list': show_spam_list
+    }
     return render(request, "website/templates/index.html", context)
 
 

@@ -25,8 +25,8 @@ class Question(models.Model):
         return user.username
     
     def last_post_user(self):
-        user = User.objects.get(id=self.last_post_by)
-        return user.username
+        user = User.objects.filter(id=self.last_post_by).first()
+        return user.username if user else "Unknown User"
 
     class Meta:
         get_latest_by = "date_created"
