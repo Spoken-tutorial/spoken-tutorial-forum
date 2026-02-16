@@ -272,13 +272,14 @@ def question_answer(request):
                 notification.qid = qid
                 notification.aid = answer.id
                 notification.save()
-                user = User.objects.get(id=question.uid)
+                
                 
                 # Sending email when an answer is posted and user answering the question has verified role in spoken
                 try:
                     ans_user = User.objects.get(id=answer.uid)
                     user_has_role = has_role(ans_user)
                     if user_has_role:
+                        user = User.objects.get(id=question.uid)
                         subject = 'Question has been answered'
                         message = """
                             Dear {0}<br><br>
