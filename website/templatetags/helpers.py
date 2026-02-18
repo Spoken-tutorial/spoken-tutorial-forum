@@ -1,6 +1,6 @@
 from django import template
+from django.core.cache import cache
 
-# from website.models import Question, Answer, Notification
 from website.helpers import prettify
 from django.conf import settings
 import os.path
@@ -9,12 +9,21 @@ register = template.Library()
 
 
 def get_category_image(category):
+    cache_key = f'category_image:{category}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     base_path = settings.BASE_DIR + '/static/website/images/'
     file_name = category.replace(' ', '-') + '.jpg'
     file_path = base_path + file_name
     if os.path.isfile(file_path):
-        return 'website/images/' + file_name
-    return False
+        value = 'website/images/' + file_name
+    else:
+        value = False
+
+    cache.set(cache_key, value, 3600)
+    return value
 
 
 register.filter('get_category_image', get_category_image)
