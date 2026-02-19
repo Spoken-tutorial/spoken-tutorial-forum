@@ -25,7 +25,7 @@ from website.permissions import is_administrator, is_forumsadmin
 
 User = get_user_model()
 
-HOME_CACHE_TIMEOUT = 10
+HOME_CACHE_TIMEOUT = 3600
 
 
 def _get_home_categories():
@@ -34,41 +34,32 @@ def _get_home_categories():
     if categories is not None:
         return categories
 
-    categories = []
     trs = TutorialResources.objects.filter(
         Q(status=1) | Q(status=2),
         tutorial_detail__foss__show_on_homepage__lt=2,
         language__name='English',
     )
     trs = trs.values_list('tutorial_detail__foss__foss', flat=True).order_by('tutorial_detail__foss__foss').distinct()
-    for foss_name in trs:
-        categories.append(foss_name)
-
+    categories = list(trs)
     cache.set(cache_key, categories, HOME_CACHE_TIMEOUT)
     return categories
 
 
-def _get_home_base_queryset():
-    return Question.objects.annotate(answer_count=Count('answer'))
-
-
-def _get_home_questions():
+def _get_home_questions(base_queryset):
     cache_key = 'home:recent_questions'
     questions = cache.get(cache_key)
     if questions is not None:
         return questions
-    base_queryset = _get_home_base_queryset()
     questions = list(base_queryset.filter(status=1).order_by('-date_created')[:100])
     cache.set(cache_key, questions, HOME_CACHE_TIMEOUT)
     return questions
 
 
-def _get_home_active_questions():
+def _get_home_active_questions(base_queryset):
     cache_key = 'home:active_questions'
     questions = cache.get(cache_key)
     if questions is not None:
         return questions
-    base_queryset = _get_home_base_queryset()
     questions = list(
         base_queryset.filter(status=1, last_active__isnull=False).order_by('-last_active')[:100]
     )
@@ -76,13 +67,12 @@ def _get_home_active_questions():
     return questions
 
 
-def _get_home_slider_questions():
+def _get_home_slider_questions(base_queryset):
     cache_key = 'home:slider_questions'
     slider_questions = cache.get(cache_key)
     if slider_questions is not None:
         return slider_questions
 
-    base_queryset = _get_home_base_queryset()
     subquery = (
         Question.objects.filter(category=OuterRef('category'), status=1)
         .values('category')
@@ -96,12 +86,11 @@ def _get_home_slider_questions():
     return slider_questions
 
 
-def _get_home_spam_questions():
+def _get_home_spam_questions(base_queryset):
     cache_key = 'home:spam_questions'
     spam_questions = cache.get(cache_key)
     if spam_questions is not None:
         return spam_questions
-    base_queryset = _get_home_base_queryset()
     spam_questions = list(base_queryset.filter(status=2).order_by('-last_active')[:100])
     cache.set(cache_key, spam_questions, HOME_CACHE_TIMEOUT)
     return spam_questions
@@ -139,14 +128,16 @@ def _get_home_category_question_map(categories, slider_questions):
 
 
 def home(request):
-    questions = _get_home_questions()
-    active_questions = _get_home_active_questions()
-    slider_questions = _get_home_slider_questions()
+    base_queryset = Question.objects.annotate(answer_count=Count('answer'))
+
+    questions = _get_home_questions(base_queryset)
+    active_questions = _get_home_active_questions(base_queryset)
+    slider_questions = _get_home_slider_questions(base_queryset)
 
     spam_questions = []
     show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
     if show_spam_list:
-        spam_questions = _get_home_spam_questions()
+        spam_questions = _get_home_spam_questions(base_queryset)
 
     all_questions = list(questions) + list(active_questions) + list(slider_questions) + list(spam_questions)
     uids = set()
@@ -694,6 +685,7 @@ def clear_notifications(request):
 
 
 def search(request):
+    categories = _get_home_categories()
     context = {
         'categories': categories
     }
@@ -704,6 +696,7 @@ def search(request):
 
 
 def ajax_category(request):
+    categories = _get_home_categories()
     context = {
         'categories': categories
     }

@@ -238,9 +238,16 @@ COMPRESS_CSS_FILTERS = (
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-    }
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': 'localhost:11211',
+        'TIMEOUT': 3600 * 24,
+        'KEY_PREFIX': 'forums',
+    },
+    'file_cache': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'topper_cache_table',
+        'TIMEOUT': 3600 * 24 * 30,
+    },
 }
 
 COMPRESS_ENABLED = True
