@@ -236,13 +236,25 @@ COMPRESS_CSS_FILTERS = (
     'compressor.filters.cssmin.CSSMinFilter',
 )
 
-CACHES = {
-    'default': {
+# Use Memcached when the memcache package is available; otherwise use local memory
+# (e.g. for local development without Memcached).
+try:
+    import memcache  # noqa: F401
+    _default_cache = {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
         'LOCATION': 'localhost:11211',
         'TIMEOUT': 3600 * 24,
         'KEY_PREFIX': 'forums',
-    },
+    }
+except ImportError:
+    _default_cache = {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'TIMEOUT': 3600 * 24,
+        'KEY_PREFIX': 'forums',
+    }
+
+CACHES = {
+    'default': _default_cache,
     'file_cache': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'topper_cache_table',
