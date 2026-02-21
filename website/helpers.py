@@ -1,4 +1,5 @@
 import re
+import hashlib
 from website.models import Question
 from nltk.corpus import stopwords 
 from nltk.tokenize import word_tokenize
@@ -31,6 +32,45 @@ def get_video_info(path):
     info_m['seconds'] = seconds
     info_m['duration'] = total
     return info_m
+
+
+def make_cache_key(prefix, *parts):
+    """
+    Create a Memcached-safe cache key by hashing if necessary.
+    
+    Memcached has restrictions on cache keys:
+    - No spaces or control characters
+    - Maximum 250 bytes length
+    
+    This function constructs a key from prefix and parts, and hashes it
+    if it contains spaces, special characters, or exceeds 200 bytes (safe limit).
+    
+    Args:
+        prefix: The key prefix (e.g., 'category_image')
+        *parts: Variable parts to include in the key (e.g., category name)
+    
+    Returns:
+        A normalized cache key string safe for Memcached
+    """
+    # Construct the key string
+    key_parts = [str(part) for part in parts]
+    key_string = ':'.join([prefix] + key_parts)
+    
+    # Check if key needs hashing:
+    # 1. Contains spaces or control characters
+    # 2. Exceeds 200 bytes (safe limit, Memcached allows 250)
+    needs_hashing = (
+        ' ' in key_string or
+        '\x00' in key_string or
+        len(key_string.encode('utf-8')) > 200
+    )
+    
+    if needs_hashing:
+        # Hash the entire key and use hex digest (64 chars, always safe)
+        key_hash = hashlib.sha256(key_string.encode('utf-8')).hexdigest()
+        return f'{prefix}:{key_hash}'
+    
+    return key_string
 
 
 def prettify(string):
