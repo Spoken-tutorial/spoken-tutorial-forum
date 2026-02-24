@@ -10,6 +10,7 @@ from django.db.models import Q, OuterRef, Subquery, Max, Count
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 
 from website.models import Question, Answer, Notification, AnswerComment
 from spoken_auth.models import TutorialDetails, TutorialResources
@@ -23,31 +24,121 @@ from forums.views import user_logout
 from website.permissions import is_administrator, is_forumsadmin
 
 User = get_user_model()
-categories = []
-trs = TutorialResources.objects.filter(Q(status=1) | Q(status=2),tutorial_detail__foss__show_on_homepage__lt=2, language__name='English')
-trs = trs.values('tutorial_detail__foss__foss').order_by('tutorial_detail__foss__foss')
 
-for tr in trs.values_list('tutorial_detail__foss__foss').distinct():
-    categories.append(tr[0])
+HOME_CACHE_TIMEOUT = 3600
+
+
+def _get_home_categories():
+    cache_key = 'home:categories'
+    categories = cache.get(cache_key)
+    if categories is not None:
+        return categories
+
+    trs = TutorialResources.objects.filter(
+        Q(status=1) | Q(status=2),
+        tutorial_detail__foss__show_on_homepage__lt=2,
+        language__name='English',
+    )
+    trs = trs.values_list('tutorial_detail__foss__foss', flat=True).order_by('tutorial_detail__foss__foss').distinct()
+    categories = list(trs)
+    cache.set(cache_key, categories, HOME_CACHE_TIMEOUT)
+    return categories
+
+
+def _get_home_questions(base_queryset):
+    cache_key = 'home:recent_questions'
+    questions = cache.get(cache_key)
+    if questions is not None:
+        return questions
+    questions = list(base_queryset.filter(status=1).order_by('-date_created')[:100])
+    cache.set(cache_key, questions, HOME_CACHE_TIMEOUT)
+    return questions
+
+
+def _get_home_active_questions(base_queryset):
+    cache_key = 'home:active_questions'
+    questions = cache.get(cache_key)
+    if questions is not None:
+        return questions
+    questions = list(
+        base_queryset.filter(status=1, last_active__isnull=False).order_by('-last_active')[:100]
+    )
+    cache.set(cache_key, questions, HOME_CACHE_TIMEOUT)
+    return questions
+
+
+def _get_home_slider_questions(base_queryset):
+    cache_key = 'home:slider_questions'
+    slider_questions = cache.get(cache_key)
+    if slider_questions is not None:
+        return slider_questions
+
+    subquery = (
+        Question.objects.filter(category=OuterRef('category'), status=1)
+        .values('category')
+        .annotate(max_date=Max('date_created'))
+        .values('max_date')
+    )
+    slider_questions = list(
+        base_queryset.filter(date_created=Subquery(subquery), status=1).order_by('category')
+    )
+    cache.set(cache_key, slider_questions, HOME_CACHE_TIMEOUT)
+    return slider_questions
+
+
+def _get_home_spam_questions(base_queryset):
+    cache_key = 'home:spam_questions'
+    spam_questions = cache.get(cache_key)
+    if spam_questions is not None:
+        return spam_questions
+    spam_questions = list(base_queryset.filter(status=2).order_by('-last_active')[:100])
+    cache.set(cache_key, spam_questions, HOME_CACHE_TIMEOUT)
+    return spam_questions
+
+
+def _get_home_category_question_map(categories, slider_questions):
+    cache_key = 'home:category_question_map'
+    category_question_map = cache.get(cache_key)
+    if category_question_map is not None:
+        return category_question_map
+
+    category_fosses = {val.replace(" ", "-"): val for val in categories}
+    all_eligible_categories = list(category_fosses.keys())
+
+    category_question_map = {}
+    for question in slider_questions:
+        if question.category in all_eligible_categories:
+            foss = category_fosses.get(question.category)
+            category_question_map[foss] = {
+                "id": question.id,
+                "question": question.title,
+                "foss_url": question.category,
+            }
+
+    for category in category_fosses.keys():
+        foss = category_fosses.get(category)
+        if foss not in category_question_map:
+            category_question_map[foss] = None
+
+    category_question_map = dict(
+        sorted(category_question_map.items(), key=lambda item: item[0].lower())
+    )
+    cache.set(cache_key, category_question_map, HOME_CACHE_TIMEOUT)
+    return category_question_map
 
 
 def home(request):
-    # Base query with answer count annotation
     base_queryset = Question.objects.annotate(answer_count=Count('answer'))
-    
-    questions = base_queryset.filter(status=1).order_by('-date_created')[:100]
-    active_questions = base_queryset.filter(status=1, last_active__isnull=False).order_by('-last_active')[:100]
-    
-    # Retrieve latest questions per category for the slider
-    subquery = Question.objects.filter(category=OuterRef('category'), status=1).values('category').annotate(max_date=Max('date_created')).values('max_date')
-    slider_questions = base_queryset.filter(
-            date_created=Subquery(subquery), status=1
-    ).order_by('category')
-    
-    # spam questions
-    spam_questions = base_queryset.filter(status=2).order_by('-last_active')[:100]
 
-    # Bulk fetch users for all displayed questions to avoid N+1
+    questions = _get_home_questions(base_queryset)
+    active_questions = _get_home_active_questions(base_queryset)
+    slider_questions = _get_home_slider_questions(base_queryset)
+
+    spam_questions = []
+    show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
+    if show_spam_list:
+        spam_questions = _get_home_spam_questions(base_queryset)
+
     all_questions = list(questions) + list(active_questions) + list(slider_questions) + list(spam_questions)
     uids = set()
     for q in all_questions:
@@ -62,28 +153,8 @@ def home(request):
         q.cached_user = users.get(q.uid, "Unknown User")
         q.cached_last_post_user = users.get(q.last_post_by, "Unknown User") if q.last_post_by else "Unknown User"
 
-    # Mapping of foss name as in spk db & its corresponding category name in forums db
-    category_fosses = {val.replace(" ", "-") : val for val in categories}    
-
-    # All eligible categories to be shown in homepage slider
-    all_eligible_categories = list(category_fosses.keys())
-    
-    # Create a dictionary to map categories to questions for the slider
-    category_question_map = {}
-    for question in slider_questions:
-        if question.category in all_eligible_categories:
-            foss = category_fosses.get(question.category)
-            category_question_map[foss] = {"id" : question.id, "question": question.title, "foss_url": question.category}
-    
-    # Fill in missing categories without questions
-    for category in category_fosses.keys():
-        foss = category_fosses.get(category)
-        if foss not in category_question_map:
-            category_question_map[foss] = None
-    
-    # Sort category_question_map by category name
-    category_question_map = dict(sorted(category_question_map.items(), key= lambda item: item[0].lower()))
-    show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
+    categories = _get_home_categories()
+    category_question_map = _get_home_category_question_map(categories, slider_questions)
     
     context = {
         'questions': questions,
@@ -614,6 +685,7 @@ def clear_notifications(request):
 
 
 def search(request):
+    categories = _get_home_categories()
     context = {
         'categories': categories
     }
@@ -624,6 +696,7 @@ def search(request):
 
 
 def ajax_category(request):
+    categories = _get_home_categories()
     context = {
         'categories': categories
     }

@@ -1,4 +1,5 @@
 from django import template
+from django.core.cache import cache
 
 from website.models import Question, Answer
 
@@ -86,7 +87,13 @@ register.filter('div', div)
 
 # retriving total number of questions
 def total_question_count():
+    cache_key = 'stats:total_questions'
+    count = cache.get(cache_key)
+    if count is not None:
+        return count
+
     count = Question.objects.filter(status=1).count()
+    cache.set(cache_key, count, 10)
     return count
 
 
@@ -95,7 +102,13 @@ register.simple_tag(total_question_count)
 
 # retriving total number of answers
 def total_answer_count():
+    cache_key = 'stats:total_answers'
+    count = cache.get(cache_key)
+    if count is not None:
+        return count
+
     count = Answer.objects.filter(question__status=1).count()
+    cache.set(cache_key, count, 10)
     return count
 
 
