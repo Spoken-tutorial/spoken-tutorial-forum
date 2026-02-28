@@ -100,7 +100,7 @@
                               </li> <!-- /li.dropdown -->
                               {% else %}
                               <li>
-                                <a href="{% url 'user_login' %}">
+                                <a href="{% url 'user_login' %}?next={{ request.get_full_path|urlencode }}">
                                     <span class="glyphicon glyphicon-user"></span> 
                                     Login
                                 </a>

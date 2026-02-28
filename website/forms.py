@@ -9,11 +9,30 @@ minutes = ()
 seconds = ()
 
 
+def _get_category_choices():
+    """Distinct FOSS categories for new-question form, sorted alphabetically."""
+    categories = list(
+        TutorialResources.objects.filter(
+            Q(status=1) | Q(status=2),
+            language__name='English',
+            tutorial_detail__foss__show_on_homepage=1,
+        )
+        .values_list('tutorial_detail__foss__foss', flat=True)
+        .distinct()
+    )
+    # Remove empty/None and sort case-insensitively (A-Z)
+    categories = [c for c in categories if c]
+    categories = sorted(set(categories), key=lambda x: x.lower())
+    return [('', 'Select a Category')] + [(c, c) for c in categories]
+
+
 class NewQuestionForm(forms.Form):
-    category = forms.ChoiceField(choices=[('', 'Select a Category'), ] + list(TutorialResources.objects.filter(
-        Q(status=1) | Q(status=2), language__name='English',tutorial_detail__foss__show_on_homepage=1).values_list('tutorial_detail__foss__foss',
-                                                       'tutorial_detail__foss__foss').distinct()),
-        widget=forms.Select(attrs={}), required=True, error_messages={'required': 'State field is required.'})
+    category = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={}),
+        required=True,
+        error_messages={'required': 'State field is required.'},
+    )
     title = forms.CharField(max_length=200)
     body = forms.CharField(widget=forms.Textarea())
 
@@ -24,6 +43,7 @@ class NewQuestionForm(forms.Form):
         select_min = kwargs.pop('minute_range', None)
         select_sec = kwargs.pop('second_range', None)
         super(NewQuestionForm, self).__init__(*args, **kwargs)
+        self.fields['category'].choices = _get_category_choices()
         tutorial_choices = (
             ("Select a Tutorial", "Select a Tutorial"),
         )
@@ -48,7 +68,9 @@ class NewQuestionForm(forms.Form):
             category = args[0]['category']
         if FossCategory.objects.filter(foss=category).exists():
             self.fields['category'].initial = category
-            tutorials = TutorialDetails.objects.using('spoken').filter(foss__foss=category)
+            tutorials = TutorialDetails.objects.using('spoken').filter(
+                foss__foss=category
+            ).order_by('level', 'order')
             for tutorial in tutorials:
                 tutorial_choices += ((tutorial.tutorial, tutorial.tutorial),)
             self.fields['tutorial'] = forms.CharField(widget=forms.Select(choices=tutorial_choices))
