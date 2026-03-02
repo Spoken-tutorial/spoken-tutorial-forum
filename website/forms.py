@@ -37,29 +37,44 @@ class NewQuestionForm(forms.Form):
     body = forms.CharField(widget=forms.Textarea())
 
     def __init__(self, *args, **kwargs):
+        # Values that can be passed explicitly (e.g. from the spoken website)
         category = kwargs.pop('category', None)
         selecttutorial = kwargs.pop('tutorial', None)
-
         select_min = kwargs.pop('minute_range', None)
         select_sec = kwargs.pop('second_range', None)
+
         super(NewQuestionForm, self).__init__(*args, **kwargs)
         self.fields['category'].choices = _get_category_choices()
         tutorial_choices = (
             ("Select a Tutorial", "Select a Tutorial"),
         )
-        # check minute_range, secpnd_range coming from spoken website
-        # user clicks on post question link through website
-        if (select_min is None and select_sec is None):
+
+        # If no explicit minute/second values were provided (e.g. normal POST),
+        # preserve any values that came from submitted form data so that
+        # validation errors (like missing reCAPTCHA) do not wipe them out.
+        data = args[0] if args else {}
+        if select_min is None and data and 'minute_range' in data:
+            select_min = data.get('minute_range')
+        if select_sec is None and data and 'second_range' in data:
+            select_sec = data.get('second_range')
+
+        # When a minute/second value is available (from the spoken website or a
+        # previous form submission), show that value as the only selectable
+        # option; otherwise show the default placeholders.
+        if select_min:
             minutes = (
                 (select_min, select_min),
-            )
-            seconds = (
-                (select_sec, select_sec),
             )
         else:
             minutes = (
                 ("", "min"),
             )
+
+        if select_sec:
+            seconds = (
+                (select_sec, select_sec),
+            )
+        else:
             seconds = (
                 ("", "sec"),
             )
