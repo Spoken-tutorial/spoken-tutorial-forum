@@ -231,7 +231,7 @@
                 </a>
                 {% else %}
                 <br>
-                <a class="btn btn-xs btn-success vs" href="/accounts/login">
+                <a class="btn btn-xs btn-success vs" href="{% url 'user_login' %}?next={{ request.get_full_path|urlencode }}">
                     Login to add comment
                 </a>
                 {% endif %}
@@ -264,7 +264,7 @@
     </form>
 {% else %}
     <h4>
-        <a class="btn btn-xs btn-success" href="{% url 'user_login'%}"><b>Log-in</b></a> to answer to this question.
+        <a class="btn btn-xs btn-success" href="{% url 'user_login' %}?next={{ request.get_full_path|urlencode }}"><b>Log-in</b></a> to answer to this question.
     </h4> 
 {% endif %}
 
