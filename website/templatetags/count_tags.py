@@ -6,10 +6,16 @@ from website.models import Question, Answer
 register = template.Library()
 
 
-# Counts the number of questions in <category>
+# Counts the number of questions in <category>, cached for faster rendering
 def category_question_count(category):
-    category_question_count = Question.objects.filter(category=category).count()
-    return category_question_count
+    cache_key = f"stats:category_question_count:{category}"
+    count = cache.get(cache_key)
+    if count is not None:
+        return count
+
+    count = Question.objects.filter(category=category).count()
+    cache.set(cache_key, count, 300)
+    return count
 
 
 register.simple_tag(category_question_count)

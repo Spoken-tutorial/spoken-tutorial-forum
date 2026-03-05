@@ -167,8 +167,7 @@ def home(request):
 
 
 def questions(request):
-    questions = Question.objects.filter(status=1).order_by('category', 'tutorial')
-    questions = questions.annotate(total_answers=Count('answer'))
+    questions = Question.objects.filter(status=1).annotate(total_answers=Count('answer')).order_by('category', 'tutorial')
 
     raw_get_data = request.GET.get('o', None)
 
@@ -194,16 +193,22 @@ def questions(request):
         questions = paginator.page(1)
     except EmptyPage:
         questions = paginator.page(paginator.num_pages)
+    # Attach cached usernames to avoid N+1 in templates
+    uids = {q.uid for q in questions}
+    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+    for q in questions:
+        q.cached_user = users.get(q.uid, "Unknown User")
+
     context = {
         'questions': questions,
         'header': header,
-        'ordering': ordering
-        }
+        'ordering': ordering,
+    }
     return render(request, 'website/templates/questions.html', context)
 
 
 def hidden_questions(request):
-    questions = Question.objects.filter(status=0).order_by('date_created').reverse()
+    questions = Question.objects.filter(status=0).annotate(total_answers=Count('answer')).order_by('-date_created')
     paginator = Paginator(questions, 20)
     page = request.GET.get('page')
 
@@ -213,8 +218,14 @@ def hidden_questions(request):
         questions = paginator.page(1)
     except EmptyPage:
         questions = paginator.page(paginator.num_pages)
+    # Attach cached usernames similar to questions() view
+    uids = {q.uid for q in questions}
+    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+    for q in questions:
+        q.cached_user = users.get(q.uid, "Unknown User")
+
     context = {
-        'questions': questions
+        'questions': questions,
     }
     return render(request, 'website/templates/questions.html', context)
 
@@ -225,19 +236,39 @@ def get_question(request, question_id=None, pretty_url=None):
     category = FossCategory.objects.all().order_by('foss')
     if pretty_url != pretty_title:
         return HttpResponseRedirect('/question/' + question_id + '/' + pretty_title)
-    answers = question.answer_set.all()
+    # Prefetch answers and their comments to avoid N+1 queries
+    answers = (
+        question.answer_set.all()
+        .prefetch_related('answercomment_set')
+        .order_by('date_created')
+    )
     form = AnswerQuesitionForm()
     if question.status in (0,2):
         label = "Show"
     else:
         label = "Hide"
     
+    # Cache usernames for question, answers and comments
+    uids = {question.uid}
+    for answer in answers:
+        uids.add(answer.uid)
+        for comment in answer.answercomment_set.all():
+            uids.add(comment.uid)
+
+    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+
+    question.cached_user = users.get(question.uid, "Unknown User")
+    for answer in answers:
+        answer.cached_user = users.get(answer.uid, "Unknown User")
+        for comment in answer.answercomment_set.all():
+            comment.cached_user = users.get(comment.uid, "Unknown User")
+
     context = {
         'question': question,
         'answers': answers,
         'category': category,
         'form': form,
-        'label': label
+        'label': label,
     }
     user_has_role = has_role(request.user)
     context['require_recaptcha'] = not user_has_role
@@ -657,7 +688,11 @@ def user_answers(request, user_id):
     if str(user_id) == str(request.user.id):
         total = Answer.objects.filter(uid=user_id).count()
         total = int(total - (total % 10 - 10))
-        answers = Answer.objects.filter(uid=user_id).order_by('date_created').reverse()[marker:marker + 10]
+        answers = (
+            Answer.objects.filter(uid=user_id)
+            .select_related('question')
+            .order_by('-date_created')[marker:marker + 10]
+        )
         context = {
             'answers': answers,
             'total': total,
@@ -670,9 +705,26 @@ def user_answers(request, user_id):
 @login_required
 def user_notifications(request, user_id):
     if str(user_id) == str(request.user.id):
-        notifications = Notification.objects.filter(uid=user_id).order_by('date_created').reverse()
+        notifications = list(
+            Notification.objects.filter(uid=user_id).order_by('-date_created')
+        )
+
+        # Prefetch related questions, answers and posters in bulk
+        qids = {n.qid for n in notifications if n.qid}
+        aids = {n.aid for n in notifications if n.aid}
+        pids = {n.pid for n in notifications if n.pid}
+
+        questions = {q.id: q for q in Question.objects.filter(id__in=qids)}
+        answers = {a.id: a for a in Answer.objects.filter(id__in=aids)}
+        users = {u.id: u.username for u in User.objects.filter(id__in=pids)}
+
+        for n in notifications:
+            n.cached_question = questions.get(n.qid)
+            n.cached_answer = answers.get(n.aid)
+            n.cached_poster = users.get(n.pid, "Unknown User")
+
         context = {
-            'notifications': notifications
+            'notifications': notifications,
         }
         return render(request, 'website/templates/notifications.html', context)
     return HttpResponse("go away ...")
@@ -836,13 +888,22 @@ def ajax_similar_questions(request):
         user_title = clean_user_data(title)
         # Increase the threshold as the Forums questions increase
         THRESHOLD = 0.3
+        MAX_CANDIDATES = 200
+        MAX_RESULTS = 20
+
         top_ques = []
-        questions = Question.objects.filter(category=category,tutorial=tutorial)
+        # Limit number of candidate questions to keep CPU usage bounded
+        questions = Question.objects.filter(
+            category=category,
+            tutorial=tutorial,
+        ).order_by('-date_created')[:MAX_CANDIDATES]
+
         for question in questions:
-             question.similarity= get_similar_questions(user_title,question.title)
-             if question.similarity >= THRESHOLD:
+            question.similarity = get_similar_questions(user_title, question.title)
+            if question.similarity >= THRESHOLD:
                 top_ques.append(question)
-        top_ques = sorted(top_ques,key=lambda x : x.similarity, reverse=True)
+
+        top_ques = sorted(top_ques, key=lambda x: x.similarity, reverse=True)[:MAX_RESULTS]
         context = {
             'questions': top_ques,
             'questions_count':len(top_ques)
@@ -895,18 +956,23 @@ def ajax_keyword_search(request):
         questions = Question.objects.filter(
             Q(title__icontains=key) | Q(category__icontains=key) |
             Q(tutorial__icontains=key) | Q(body__icontains=key), status=1
-            ).order_by('-date_created')
+        ).annotate(total_answers=Count('answer')).order_by('-date_created')
+
         paginator = Paginator(questions, 20)
         page = request.POST.get('page')
-        if page:
-            page = int(request.POST.get('page'))
-            questions = paginator.page(page)
         try:
             questions = paginator.page(page)
         except PageNotAnInteger:
             questions = paginator.page(1)
         except EmptyPage:
             questions = paginator.page(paginator.num_pages)
+
+        # Attach cached usernames for the current page
+        uids = {q.uid for q in questions}
+        users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+        for q in questions:
+            q.cached_user = users.get(q.uid, "Unknown User")
+
         context = {
             'questions': questions
         }
@@ -919,19 +985,38 @@ def ajax_time_search(request):
         tutorial = request.POST.get('tutorial')
         minute_range = request.POST.get('minute_range')
         second_range = request.POST.get('second_range')
-        questions = None
+        questions = Question.objects.none()
         if category:
-            questions = Question.objects.filter(category=category.replace(' ', '-'), status=1)
+            questions = Question.objects.filter(
+                category=category.replace(' ', '-'),
+                status=1,
+            )
         if tutorial:
             questions = questions.filter(tutorial=tutorial.replace(' ', '-'))
         if minute_range:
-            questions = questions.filter(category=category.replace(
-                ' ', '-'), tutorial=tutorial.replace(' ', '-'), minute_range=minute_range)
+            questions = questions.filter(minute_range=minute_range)
         if second_range:
-            questions = questions.filter(category=category.replace(
-                ' ', '-'), tutorial=tutorial.replace(' ', '-'), second_range=second_range)
+            questions = questions.filter(second_range=second_range)
+
+        questions = questions.annotate(total_answers=Count('answer')).order_by('-date_created')
+
+        paginator = Paginator(questions, 20)
+        page = request.POST.get('page')
+        try:
+            questions = paginator.page(page)
+        except PageNotAnInteger:
+            questions = paginator.page(1)
+        except EmptyPage:
+            questions = paginator.page(paginator.num_pages)
+
+        # Attach cached usernames for the current page
+        uids = {q.uid for q in questions}
+        users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+        for q in questions:
+            q.cached_user = users.get(q.uid, "Unknown User")
+
         context = {
-            'questions': questions
+            'questions': questions,
         }
         return render(request, 'website/templates/ajax-time-search.html', context)
 
@@ -956,27 +1041,30 @@ def forums_mail(to='', subject='', message=''):
 
 
 def unanswered_notification(request):
-    questions = Question.objects.filter(status=1)
+    unanswered_questions = (
+        Question.objects.filter(status=1)
+        .annotate(answer_count=Count('answer'))
+        .filter(answer_count=0)
+    )
     total_count = 0
     message = """
         The following questions are left unanswered.
         Please take a look at them. <br><br>
     """
-    for question in questions:
-        if not question.answer_set.count():
-            total_count += 1
-            message += """
-                #{0}<br>
-                Title: <b>{1}</b><br>
-                Category: <b>{2}</b><br>
-                Link: <b>{3}</b><br>
-                <hr>
-            """.format(
-                total_count,
-                question.title,
-                question.category,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id)
-            )
+    for question in unanswered_questions:
+        total_count += 1
+        message += """
+            #{0}<br>
+            Title: <b>{1}</b><br>
+            Category: <b>{2}</b><br>
+            Link: <b>{3}</b><br>
+            <hr>
+        """.format(
+            total_count,
+            question.title,
+            question.category,
+            'http://forums.spoken-tutorial.org/question/' + str(question.id)
+        )
     to = "team@spoken-tutorial.org, team@fossee.in"
     subject = "Unanswered questions in the forums."
     if total_count:
