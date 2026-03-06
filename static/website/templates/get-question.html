@@ -136,7 +136,7 @@
             </small>
             
             <span class="user">
-                {{ question.user }}
+                {{ question.cached_user|default:question.user }}
             </span>
         </span>
     </div> <!-- /.question -->
@@ -169,7 +169,7 @@
                 </small>
                 
                 <span class="user">
-                    {{ answer.user }}
+                    {{ answer.cached_user|default:answer.user }}
                 </span>
             </span>
             {% if user|can_edit:answer  %}
@@ -199,7 +199,7 @@
                         </small>
                         
                         <span class="user">
-                            {{ comment.user }}
+                            {{ comment.cached_user|default:comment.user }}
                         </span>
                     </span>
                     {% if user|can_edit:comment %}
@@ -264,7 +264,7 @@
     </form>
 {% else %}
     <h4>
-        <a class="btn btn-xs btn_success" href="{% url 'user_login'%}?next={{ request.get_full_path|urlencode }}"><b>Log-in</b></a> to answer to this question.
+        <a class="btn btn-xs btn-success" href="{% url 'user_login' %}?next={{ request.get_full_path|urlencode }}"><b>Log-in</b></a> to answer to this question.
     </h4> 
 {% endif %}
 

@@ -21,12 +21,22 @@ class Question(models.Model):
     # votes = models.IntegerField(default=0)
 
     def user(self):
+        cached_username = getattr(self, "cached_user", None)
+        if cached_username is not None:
+            return cached_username
         user = User.objects.get(id=self.uid)
-        return user.username
+        username = user.username
+        self.cached_user = username
+        return username
     
     def last_post_user(self):
+        cached_username = getattr(self, "cached_last_post_user", None)
+        if cached_username is not None:
+            return cached_username
         user = User.objects.filter(id=self.last_post_by).first()
-        return user.username if user else "Unknown User"
+        username = user.username if user else "Unknown User"
+        self.cached_last_post_user = username
+        return username
 
     class Meta:
         get_latest_by = "date_created"
@@ -54,8 +64,13 @@ class Answer(models.Model):
     # votes = models.IntegerField(default=0)
 
     def user(self):
+        cached_username = getattr(self, "cached_user", None)
+        if cached_username is not None:
+            return cached_username
         user = User.objects.get(id=self.uid)
-        return user.username
+        username = user.username
+        self.cached_user = username
+        return username
 
 
 class AnswerVote(models.Model):
@@ -71,8 +86,13 @@ class AnswerComment(models.Model):
     date_modified = models.DateTimeField(auto_now=True)
 
     def user(self):
+        cached_username = getattr(self, "cached_user", None)
+        if cached_username is not None:
+            return cached_username
         user = User.objects.get(id=self.uid)
-        return user.username
+        username = user.username
+        self.cached_user = username
+        return username
 
 
 class Notification(models.Model):
@@ -84,7 +104,12 @@ class Notification(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
 
     def poster(self):
+        cached_username = getattr(self, "cached_poster", None)
+        if cached_username is not None:
+            return cached_username
         user = User.objects.get(id=self.pid)
-        return user.username
+        username = user.username
+        self.cached_poster = username
+        return username
 
 # CDEEP database created using inspectdb arg of manage.py

@@ -1,14 +1,21 @@
 from django import template
+from django.core.cache import cache
 
 from website.models import Question, Answer
 
 register = template.Library()
 
 
-# Counts the number of questions in <category>
+# Counts the number of questions in <category>, cached for faster rendering
 def category_question_count(category):
-    category_question_count = Question.objects.filter(category=category).count()
-    return category_question_count
+    cache_key = f"stats:category_question_count:{category}"
+    count = cache.get(cache_key)
+    if count is not None:
+        return count
+
+    count = Question.objects.filter(category=category).count()
+    cache.set(cache_key, count, 300)
+    return count
 
 
 register.simple_tag(category_question_count)
@@ -86,7 +93,13 @@ register.filter('div', div)
 
 # retriving total number of questions
 def total_question_count():
+    cache_key = 'stats:total_questions'
+    count = cache.get(cache_key)
+    if count is not None:
+        return count
+
     count = Question.objects.filter(status=1).count()
+    cache.set(cache_key, count, 10)
     return count
 
 
@@ -95,7 +108,13 @@ register.simple_tag(total_question_count)
 
 # retriving total number of answers
 def total_answer_count():
+    cache_key = 'stats:total_answers'
+    count = cache.get(cache_key)
+    if count is not None:
+        return count
+
     count = Answer.objects.filter(question__status=1).count()
+    cache.set(cache_key, count, 10)
     return count
 
 

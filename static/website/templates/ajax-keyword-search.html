@@ -63,16 +63,16 @@
         </td>
 
         <td>
-            {{ question.views}}
+            {{ question.views }}
         </td>
 
         <td>
-            {{ question.answer_set.count }}
+            {{ question.total_answers }}
         </td>
 
         <td>
-                <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.user }}">
-                {{ question.user|truncatechars:10 }}
+            <span class="title" data-toggle="tooltip" data-placement="top" title="{{ question.cached_user|default:question.user }}">
+                {{ question.cached_user|default:question.user|truncatechars:10 }}
             </span>
         </td>
 
