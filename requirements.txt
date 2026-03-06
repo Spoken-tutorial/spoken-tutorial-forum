@@ -16,3 +16,4 @@ python-dotenv==0.10.3
 nltk==3.5
 sklearn==0.0
 requests>=2.25.0
+python-memcached==1.62

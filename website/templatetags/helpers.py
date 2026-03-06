@@ -1,7 +1,7 @@
 from django import template
 from django.core.cache import cache
 
-from website.helpers import prettify
+from website.helpers import prettify, make_cache_key
 from django.conf import settings
 import os.path
 
@@ -9,7 +9,7 @@ register = template.Library()
 
 
 def get_category_image(category):
-    cache_key = f'category_image:{category}'
+    cache_key = make_cache_key('category_image', category)
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
