@@ -130,16 +130,35 @@ def _get_home_category_question_map(categories, slider_questions):
 def home(request):
     base_queryset = Question.objects.annotate(answer_count=Count('answer'))
 
-    questions = _get_home_questions(base_queryset)
-    active_questions = _get_home_active_questions(base_queryset)
+    questions_full = _get_home_questions(base_queryset)
+    active_questions_full = _get_home_active_questions(base_queryset)
     slider_questions = _get_home_slider_questions(base_queryset)
 
-    spam_questions = []
+    spam_questions = None
     show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
     if show_spam_list:
-        spam_questions = _get_home_spam_questions(base_queryset)
+        spam_questions_full = _get_home_spam_questions(base_queryset)
+        # spam paginator
+        spam_paginator = Paginator(spam_questions_full, 10)
+        spam_page_number = request.GET.get('spam_page')
+        spam_questions = spam_paginator.get_page(spam_page_number)
 
-    all_questions = list(questions) + list(active_questions) + list(slider_questions) + list(spam_questions)
+    # paginate active questions
+    recent_paginator = Paginator(questions_full, 10)
+    active_paginator = Paginator(active_questions_full, 10)
+    
+
+    recent_page_number = request.GET.get('recent_page')
+    active_page_number = request.GET.get('active_page')
+    
+
+    questions = recent_paginator.get_page(recent_page_number)
+    active_questions = active_paginator.get_page(active_page_number)
+    
+    if spam_questions is None:
+        all_questions = list(questions.object_list) + list(active_questions.object_list) + list(slider_questions)
+    else:
+        all_questions = list(questions.object_list) + list(active_questions.object_list) + list(slider_questions) + list(spam_questions.object_list)
     uids = set()
     for q in all_questions:
         uids.add(q.uid)
@@ -161,7 +180,8 @@ def home(request):
         'active_questions': active_questions,
         'spam_questions': spam_questions,
         'category_question_map': category_question_map,
-        'show_spam_list': show_spam_list
+        'show_spam_list': show_spam_list,
+        'current_tab': request.GET.get('tab', 'recent_question'),
     }
     return render(request, "website/templates/index.html", context)
 

@@ -91,14 +91,22 @@ $("#activelistTable").tablesorter({
     <div class="panel panel-default">
         <div class="panel-heading">
             <ul class="nav nav-tabs">
-                <li class="active"><a data-toggle="tab" href="#recent_question">Recent questions</a></li>
-                <li><a data-toggle="tab" href="#most_active">Most active questions</a></li>
-                {% if show_spam_list %}<li><a data-toggle="tab" href="#marked_as_spam">Marked as spam</a></li>{% endif %}
+                <li class="{% if current_tab == 'recent_question' %}active{% endif %}">
+                    <a data-toggle="tab" href="#recent_question" data-tab="recent_question">Recent questions</a>
+                </li>
+                <li class="{% if current_tab == 'most_active' %}active{% endif %}">
+                    <a data-toggle="tab" href="#most_active" data-tab="most_active">Most active questions</a>
+                </li>
+                {% if show_spam_list %}
+                <li class="{% if current_tab == 'marked_as_spam' %}active{% endif %}">
+                    <a data-toggle="tab" href="#marked_as_spam" data-tab="marked_as_spam">Marked as spam</a>
+                </li>
+                {% endif %}
             </ul>
         </div>
         <div class="panel-body">
             <div class="tab-content">
-            <div id="recent_question" class="tab-pane fade in active">
+            <div id="recent_question" class="tab-pane fade {% if current_tab == 'recent_question' %}in active{% endif %}">
             <table id = "listTable" class="tablesorter-blue">
 							<thead>
 							<tr>
@@ -181,8 +189,31 @@ $("#activelistTable").tablesorter({
                 {% endfor %}
                 </tbody>
             </table>
+            <div class="text-center" style="margin-top: 15px;">
+    <ul class="pagination">
+        {% if questions.has_previous %}
+            <li><a href="?recent_page=1&tab=recent_question">&laquo; First</a></li>
+            <li><a href="?recent_page={{ questions.previous_page_number }}&tab=recent_question">Previous</a></li>
+        {% else %}
+            <li class="disabled"><span>&laquo; First</span></li>
+            <li class="disabled"><span>Previous</span></li>
+        {% endif %}
+
+        <li class="active">
+            <span>Page {{ questions.number }} of {{ questions.paginator.num_pages }}</span>
+        </li>
+
+        {% if questions.has_next %}
+            <li><a href="?recent_page={{ questions.next_page_number }}&tab=recent_question">Next</a></li>
+            <li><a href="?recent_page={{ questions.paginator.num_pages }}&tab=recent_question">Last &raquo;</a></li>
+        {% else %}
+            <li class="disabled"><span>Next</span></li>
+            <li class="disabled"><span>Last &raquo;</span></li>
+        {% endif %}
+    </ul>
+</div>
             </div>
-            <div id="most_active" class="tab-pane fade">
+            <div id="most_active" class="tab-pane fade {% if current_tab == 'most_active' %}in active{% endif %}">
                 
                 <table id = "activelistTable" class="tablesorter-blue">
                     <thead>
@@ -279,10 +310,33 @@ $("#activelistTable").tablesorter({
                         {% endfor %}
                         </tbody>
                     </table>
+                    <div class="text-center" style="margin-top: 15px;">
+                        <ul class="pagination">
+                            {% if active_questions.has_previous %}
+                                <li><a href="?active_page=1&tab=most_active">&laquo; First</a></li>
+                                <li><a href="?active_page={{ active_questions.previous_page_number }}&tab=most_active">Previous</a></li>
+                            {% else %}
+                                <li class="disabled"><span>&laquo; First</span></li>
+                                <li class="disabled"><span>Previous</span></li>
+                            {% endif %}
+
+                            <li class="active">
+                                <span>Page {{ active_questions.number }} of {{ active_questions.paginator.num_pages }}</span>
+                            </li>
+
+                            {% if active_questions.has_next %}
+                                <li><a href="?active_page={{ active_questions.next_page_number }}&tab=most_active">Next</a></li>
+                                <li><a href="?active_page={{ active_questions.paginator.num_pages }}&tab=most_active">Last &raquo;</a></li>
+                            {% else %}
+                                <li class="disabled"><span>Next</span></li>
+                                <li class="disabled"><span>Last &raquo;</span></li>
+                            {% endif %}
+                        </ul>
+                    </div>
             </div>
             <!-- spam questions -->
              {% if show_spam_list %}
-             <div id="marked_as_spam" class="tab-pane fade">
+             <div id="marked_as_spam" class="tab-pane fade {% if current_tab == 'marked_as_spam' %}in active{% endif %}">
                 
                 <table id = "spamlistTable" class="tablesorter-blue">
                     <thead>
@@ -379,6 +433,29 @@ $("#activelistTable").tablesorter({
                         {% endfor %}
                         </tbody>
                     </table>
+                    <div class="text-center" style="margin-top: 15px;">
+                        <ul class="pagination">
+                            {% if spam_questions.has_previous %}
+                                <li><a href="?spam_page=1&tab=marked_as_spam">&laquo; First</a></li>
+                                <li><a href="?spam_page={{ spam_questions.previous_page_number }}&tab=marked_as_spam">Previous</a></li>
+                            {% else %}
+                                <li class="disabled"><span>&laquo; First</span></li>
+                                <li class="disabled"><span>Previous</span></li>
+                            {% endif %}
+
+                            <li class="active">
+                                <span>Page {{ spam_questions.number }} of {{ spam_questions.paginator.num_pages }}</span>
+                            </li>
+
+                            {% if spam_questions.has_next %}
+                                <li><a href="?spam_page={{ spam_questions.next_page_number }}&tab=marked_as_spam">Next</a></li>
+                                <li><a href="?spam_page={{ spam_questions.paginator.num_pages }}&tab=marked_as_spam">Last &raquo;</a></li>
+                            {% else %}
+                                <li class="disabled"><span>Next</span></li>
+                                <li class="disabled"><span>Last &raquo;</span></li>
+                            {% endif %}
+                        </ul>
+                    </div>
             </div>
             {% endif %}
         </div>
