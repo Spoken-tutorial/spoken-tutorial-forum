@@ -1102,7 +1102,7 @@ def verify_filter_access(request):
         return HttpResponseForbidden("Missing captcha token")
 
     try:
-        data = {'secret': settings.RECAPTCHA_SECRET_KEY, 'response': token}
+        data = {'secret': settings.RECAPTCHA_SECRET_KEY_v3, 'response': token}
         resp = requests.post('https://www.google.com/recaptcha/api/siteverify',
                              data, timeout=5)
         result = resp.json()
