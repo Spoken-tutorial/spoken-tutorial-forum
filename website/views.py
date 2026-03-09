@@ -2,7 +2,7 @@ import json
 import requests
 
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.template.context_processors import csrf
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -166,7 +166,6 @@ def home(request):
             uids.add(q.last_post_by)
     
     users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
-    
     # Attach usernames to question objects so templates don't trigger queries
     for q in all_questions:
         q.cached_user = users.get(q.uid, "Unknown User")
@@ -1090,3 +1089,40 @@ def unanswered_notification(request):
     if total_count:
         forums_mail(to, subject, message)
     return HttpResponse(message)
+
+
+def verify_filter_access(request):
+    if request.method != 'POST':
+        return HttpResponseForbidden("Invalid request method")
+    
+    token = request.POST.get('token', "").strip()
+    next_url = request.POST.get('next', "").strip()
+
+    if not token:
+        return HttpResponseForbidden("Missing captcha token")
+
+    try:
+        data = {'secret': settings.RECAPTCHA_SECRET_KEY, 'response': token}
+        resp = requests.post('https://www.google.com/recaptcha/api/siteverify',
+                             data, timeout=5)
+        result = resp.json()
+    except Exception:
+        return HttpResponseForbidden("Captcha verification service unavailable")
+    
+    success = result.get('success', False)
+    score = result.get('score', 0.0)
+    action = result.get('action', "")
+    
+
+    # Tune score threshold as needed.
+    if not success:
+        return HttpResponseForbidden("Captcha verification failed")
+    if action != 'filter_page':
+        return HttpResponseForbidden("Invalid captcha action")
+    if score < 0.5:
+        return HttpResponseForbidden("Request looks suspicious")
+
+    request.session["filter_verified"] = True
+    # optionally, set filter_verified_at timestamp session for seperate filter_verify expiiry
+
+    return redirect(next_url)

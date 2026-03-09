@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Verifying browser...</title>
+        <script src="https://www.google.com/recaptcha/api.js?render={{ site_key }}"></script>
+    </head>
+    <body>
+        <p>Verifying your browser...</p>
+        <form id="verify-form" method="post" action="{% url 'website:verify_filter_access' %}">
+            {% csrf_token %}
+            <input type="hidden" name="token" id="recaptcha_token">
+            <input type="hidden" name="next" value="{{ next_url }}">
+        </form>
+
+        <script>
+            grecaptcha.ready(function() {
+            grecaptcha.execute('{{ site_key }}', {action: 'filter_page'}).then(function(token) {
+                document.getElementById('recaptcha_token').value = token;
+                document.getElementById('verify-form').submit();
+            });
+        });
+        </script>
+    </body>
+
+</html>
+</html>
