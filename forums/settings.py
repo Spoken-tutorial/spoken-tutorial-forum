@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -23,8 +24,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
-RECAPTCHA_SITE_KEY_v3 = os.getenv("RECAPTCHA_SITE_KEY_v3")
-RECAPTCHA_SECRET_KEY_v3 = os.getenv("RECAPTCHA_SECRET_KEY_v3")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/

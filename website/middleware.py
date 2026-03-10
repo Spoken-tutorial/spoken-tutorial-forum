@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.shortcuts import render
+from forums.settings import RECAPTCHA_SITE_KEY_v3
 
 class FilterCaptchaGateMiddleware(object):
     """
@@ -15,8 +16,9 @@ class FilterCaptchaGateMiddleware(object):
         self.get_response = get_response
 
     def __call__(self, request):
+        
         path = request.path
-
+        
         # Only apply to filter endpoints
         if path.startswith('/filter/'):
 
@@ -39,7 +41,7 @@ class FilterCaptchaGateMiddleware(object):
             if needs_verification:
                     context = {
                         'next_url': request.get_full_path(),
-                        'site_key': settings.RECAPTCHA_SITE_KEY_v3
+                        'site_key': RECAPTCHA_SITE_KEY_v3
                     }
                     return render(request, 'website/templates/filter_verify.html',context)
         
