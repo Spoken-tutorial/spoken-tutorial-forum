@@ -23,6 +23,7 @@ from .sortable import SortableHeader, get_sorted_list, get_field_index
 from forums.views import user_logout
 from website.permissions import is_administrator, is_forumsadmin
 
+from forums.settings import RECAPTCHA_SECRET_KEY_v3
 User = get_user_model()
 
 HOME_CACHE_TIMEOUT = 3600
@@ -1102,7 +1103,7 @@ def verify_filter_access(request):
         return HttpResponseForbidden("Missing captcha token")
 
     try:
-        data = {'secret': settings.RECAPTCHA_SECRET_KEY_v3, 'response': token}
+        data = {'secret': RECAPTCHA_SECRET_KEY_v3, 'response': token}
         resp = requests.post('https://www.google.com/recaptcha/api/siteverify',
                              data, timeout=5)
         result = resp.json()
