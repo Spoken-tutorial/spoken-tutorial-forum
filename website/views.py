@@ -651,9 +651,7 @@ def new_question(request):
         # If form not valid -> re-render with errors
         context['form'] = form
         context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
-        # check if user needs to complete captcha
-        user_has_role = request.user.is_authenticated and request.user.groups.exists()
-        context['require_recaptcha'] = not user_has_role
+        context['require_recaptcha'] = not has_role(request.user)
         context.update(csrf(request))
         return render(request, 'website/templates/new-question.html', context)
 
