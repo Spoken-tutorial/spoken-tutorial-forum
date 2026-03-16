@@ -671,6 +671,9 @@ def new_question(request):
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
         context['category'] = category
+        context['tutorial'] = tutorial
+        context['minute_range'] = minute_range
+        context['second_range'] = second_range
         context['form'] = form
         context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
         # check if user needs to complete captcha

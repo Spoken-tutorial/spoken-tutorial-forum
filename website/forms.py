@@ -27,22 +27,14 @@ class NewQuestionForm(forms.Form):
         tutorial_choices = (
             ("Select a Tutorial", "Select a Tutorial"),
         )
-        # check minute_range, secpnd_range coming from spoken website
-        # user clicks on post question link through website
-        if (select_min is None and select_sec is None):
-            minutes = (
-                (select_min, select_min),
-            )
-            seconds = (
-                (select_sec, select_sec),
-            )
+        # Minute/second: when coming from spoken website link we get pre-filled values;
+        # otherwise show full range so user can select.
+        if select_min is not None or select_sec is not None:
+            minutes = ([(select_min, select_min)] if select_min is not None else [("", "min")] + [(str(i), str(i)) for i in range(60)])
+            seconds = ([(select_sec, select_sec)] if select_sec is not None else [("", "sec")] + [(str(i), str(i)) for i in range(60)])
         else:
-            minutes = (
-                ("", "min"),
-            )
-            seconds = (
-                ("", "sec"),
-            )
+            minutes = [("", "min")] + [(str(i), str(i)) for i in range(60)]
+            seconds = [("", "sec")] + [(str(i), str(i)) for i in range(60)]
 
         if not category and args and 'category' in args[0] and args[0]['category']:
             category = args[0]['category']
@@ -57,13 +49,25 @@ class NewQuestionForm(forms.Form):
 
                 self.fields['minute_range'] = forms.CharField(widget=forms.Select(choices=minutes))
                 self.fields['second_range'] = forms.CharField(widget=forms.Select(choices=seconds))
+                if select_min is not None:
+                    self.fields['minute_range'].initial = select_min
+                if select_sec is not None:
+                    self.fields['second_range'].initial = select_sec
             else:
                 self.fields['minute_range'] = forms.CharField(widget=forms.Select(choices=minutes))
                 self.fields['second_range'] = forms.CharField(widget=forms.Select(choices=seconds))
+                if select_min is not None:
+                    self.fields['minute_range'].initial = select_min
+                if select_sec is not None:
+                    self.fields['second_range'].initial = select_sec
         else:
             self.fields['tutorial'] = forms.CharField(widget=forms.Select(choices=tutorial_choices))
             self.fields['minute_range'] = forms.CharField(widget=forms.Select(choices=minutes))
             self.fields['second_range'] = forms.CharField(widget=forms.Select(choices=seconds))
+            if select_min is not None:
+                self.fields['minute_range'].initial = select_min
+            if select_sec is not None:
+                self.fields['second_range'].initial = select_sec
 
 
 class AnswerQuesitionForm(forms.Form):
