@@ -5,7 +5,7 @@
 {% if messages %}
   <ul class="messages">
     {% for message in messages %}
-      <li class="{{ message.tags }} alert alert-info">{{ message }}</li>
+      <li class="{{ message.tags }} alert {% if message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}">{{ message }}</li>
     {% endfor %}
   </ul>
 {% endif %}
@@ -33,10 +33,18 @@
             {% endif %}
         </div>
         <div class="col-lg-2 col-md-2 col-sm-2">
-            {% render_field form.minute_range class+="form-control" disabled="disabled" %} 
+            {% if category %}
+                {% render_field form.minute_range class+="form-control" %} 
+            {% else %}
+                {% render_field form.minute_range class+="form-control" disabled="disabled" %} 
+            {% endif %}
         </div>
         <div class="col-lg-2 col-md-2 col-sm-2">
-            {% render_field form.second_range class+="form-control" disabled="disabled" %} 
+            {% if category %}
+                {% render_field form.second_range class+="form-control" %} 
+            {% else %}
+                {% render_field form.second_range class+="form-control" disabled="disabled" %} 
+            {% endif %}
         </div>
     </div>
     <hr>

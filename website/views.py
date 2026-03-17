@@ -139,42 +139,44 @@ def home(request):
     show_spam_list = is_administrator(request.user) or is_forumsadmin(request.user)
     if show_spam_list:
         spam_questions_full = _get_home_spam_questions(base_queryset)
-        # spam paginator
         spam_paginator = Paginator(spam_questions_full, 10)
         spam_page_number = request.GET.get('spam_page')
         spam_questions = spam_paginator.get_page(spam_page_number)
 
-    # paginate active questions
     recent_paginator = Paginator(questions_full, 10)
     active_paginator = Paginator(active_questions_full, 10)
-    
 
     recent_page_number = request.GET.get('recent_page')
     active_page_number = request.GET.get('active_page')
-    
 
     questions = recent_paginator.get_page(recent_page_number)
     active_questions = active_paginator.get_page(active_page_number)
-    
+
     if spam_questions is None:
         all_questions = list(questions.object_list) + list(active_questions.object_list) + list(slider_questions)
     else:
-        all_questions = list(questions.object_list) + list(active_questions.object_list) + list(slider_questions) + list(spam_questions.object_list)
+        all_questions = (
+            list(questions.object_list) + list(active_questions.object_list)
+            + list(slider_questions) + list(spam_questions.object_list)
+        )
     uids = set()
     for q in all_questions:
         uids.add(q.uid)
         if q.last_post_by:
             uids.add(q.last_post_by)
-    
+
     users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
+
+
     # Attach usernames to question objects so templates don't trigger queries
+
     for q in all_questions:
         q.cached_user = users.get(q.uid, "Unknown User")
         q.cached_last_post_user = users.get(q.last_post_by, "Unknown User") if q.last_post_by else "Unknown User"
 
     categories = _get_home_categories()
     category_question_map = _get_home_category_question_map(categories, slider_questions)
-    
+
     context = {
         'questions': questions,
         'active_questions': active_questions,
@@ -187,7 +189,8 @@ def home(request):
 
 
 def questions(request):
-    questions = Question.objects.filter(status=1).annotate(total_answers=Count('answer')).order_by('category', 'tutorial')
+    questions = Question.objects.filter(status=1).order_by('category', 'tutorial')
+    questions = questions.annotate(total_answers=Count('answer'))
 
     raw_get_data = request.GET.get('o', None)
 
@@ -213,22 +216,16 @@ def questions(request):
         questions = paginator.page(1)
     except EmptyPage:
         questions = paginator.page(paginator.num_pages)
-    # Attach cached usernames to avoid N+1 in templates
-    uids = {q.uid for q in questions}
-    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
-    for q in questions:
-        q.cached_user = users.get(q.uid, "Unknown User")
-
     context = {
         'questions': questions,
         'header': header,
-        'ordering': ordering,
-    }
+        'ordering': ordering
+        }
     return render(request, 'website/templates/questions.html', context)
 
 
 def hidden_questions(request):
-    questions = Question.objects.filter(status=0).annotate(total_answers=Count('answer')).order_by('-date_created')
+    questions = Question.objects.filter(status=0).order_by('date_created').reverse()
     paginator = Paginator(questions, 20)
     page = request.GET.get('page')
 
@@ -238,14 +235,8 @@ def hidden_questions(request):
         questions = paginator.page(1)
     except EmptyPage:
         questions = paginator.page(paginator.num_pages)
-    # Attach cached usernames similar to questions() view
-    uids = {q.uid for q in questions}
-    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
-    for q in questions:
-        q.cached_user = users.get(q.uid, "Unknown User")
-
     context = {
-        'questions': questions,
+        'questions': questions
     }
     return render(request, 'website/templates/questions.html', context)
 
@@ -256,39 +247,19 @@ def get_question(request, question_id=None, pretty_url=None):
     category = FossCategory.objects.all().order_by('foss')
     if pretty_url != pretty_title:
         return HttpResponseRedirect('/question/' + question_id + '/' + pretty_title)
-    # Prefetch answers and their comments to avoid N+1 queries
-    answers = (
-        question.answer_set.all()
-        .prefetch_related('answercomment_set')
-        .order_by('date_created')
-    )
+    answers = question.answer_set.all()
     form = AnswerQuesitionForm()
     if question.status in (0,2):
         label = "Show"
     else:
         label = "Hide"
     
-    # Cache usernames for question, answers and comments
-    uids = {question.uid}
-    for answer in answers:
-        uids.add(answer.uid)
-        for comment in answer.answercomment_set.all():
-            uids.add(comment.uid)
-
-    users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
-
-    question.cached_user = users.get(question.uid, "Unknown User")
-    for answer in answers:
-        answer.cached_user = users.get(answer.uid, "Unknown User")
-        for comment in answer.answercomment_set.all():
-            comment.cached_user = users.get(comment.uid, "Unknown User")
-
     context = {
         'question': question,
         'answers': answers,
         'category': category,
         'form': form,
-        'label': label,
+        'label': label
     }
     user_has_role = has_role(request.user)
     context['require_recaptcha'] = not user_has_role
@@ -573,8 +544,17 @@ def new_question(request):
             
             if not recaptcha_response:
                 messages.error(request, "Please complete the reCAPTCHA verification.")
-                form = NewQuestionForm(request.POST)
+                _cat = request.POST.get('category')
+                _tut = request.POST.get('tutorial')
+                _min = request.POST.get('minute_range') or None
+                _sec = request.POST.get('second_range') or None
+                form = NewQuestionForm(request.POST, category=_cat, tutorial=_tut,
+                                       minute_range=_min, second_range=_sec)
                 context['form'] = form
+                context['category'] = _cat
+                context['tutorial'] = _tut
+                context['minute_range'] = _min
+                context['second_range'] = _sec
                 context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
                 context['require_recaptcha'] = True
                 context.update(csrf(request))
@@ -593,8 +573,17 @@ def new_question(request):
                 recaptcha_json = recaptcha_result.json()
             except requests.RequestException as e:
                 messages.error(request, "Error verifying reCAPTCHA. Please try again.")
-                form = NewQuestionForm(request.POST)
+                _cat = request.POST.get('category')
+                _tut = request.POST.get('tutorial')
+                _min = request.POST.get('minute_range') or None
+                _sec = request.POST.get('second_range') or None
+                form = NewQuestionForm(request.POST, category=_cat, tutorial=_tut,
+                                       minute_range=_min, second_range=_sec)
                 context['form'] = form
+                context['category'] = _cat
+                context['tutorial'] = _tut
+                context['minute_range'] = _min
+                context['second_range'] = _sec
                 context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
                 context['require_recaptcha'] = True
                 context.update(csrf(request))
@@ -603,8 +592,17 @@ def new_question(request):
             # check if verification was successful
             if not recaptcha_json.get('success', False):
                 messages.error(request, "reCAPTCHA verification failed. Please try again.")
-                form = NewQuestionForm(request.POST)
+                _cat = request.POST.get('category')
+                _tut = request.POST.get('tutorial')
+                _min = request.POST.get('minute_range') or None
+                _sec = request.POST.get('second_range') or None
+                form = NewQuestionForm(request.POST, category=_cat, tutorial=_tut,
+                                       minute_range=_min, second_range=_sec)
                 context['form'] = form
+                context['category'] = _cat
+                context['tutorial'] = _tut
+                context['minute_range'] = _min
+                context['second_range'] = _sec
                 context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
                 context['require_recaptcha'] = True
                 context.update(csrf(request))
@@ -649,7 +647,17 @@ def new_question(request):
             return HttpResponseRedirect('/')
 
         # If form not valid -> re-render with errors
+        _cat = request.POST.get('category')
+        _tut = request.POST.get('tutorial')
+        _min = request.POST.get('minute_range') or None
+        _sec = request.POST.get('second_range') or None
+        form = NewQuestionForm(request.POST, category=_cat, tutorial=_tut,
+                               minute_range=_min, second_range=_sec)
         context['form'] = form
+        context['category'] = _cat
+        context['tutorial'] = _tut
+        context['minute_range'] = _min
+        context['second_range'] = _sec
         context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
         # check if user needs to complete captcha
         user_has_role = request.user.is_authenticated and request.user.groups.exists()
@@ -667,6 +675,9 @@ def new_question(request):
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)
         context['category'] = category
+        context['tutorial'] = tutorial
+        context['minute_range'] = minute_range
+        context['second_range'] = second_range
         context['form'] = form
         context['recaptcha_site_key'] = settings.RECAPTCHA_SITE_KEY
         # check if user needs to complete captcha
@@ -708,11 +719,7 @@ def user_answers(request, user_id):
     if str(user_id) == str(request.user.id):
         total = Answer.objects.filter(uid=user_id).count()
         total = int(total - (total % 10 - 10))
-        answers = (
-            Answer.objects.filter(uid=user_id)
-            .select_related('question')
-            .order_by('-date_created')[marker:marker + 10]
-        )
+        answers = Answer.objects.filter(uid=user_id).order_by('date_created').reverse()[marker:marker + 10]
         context = {
             'answers': answers,
             'total': total,
@@ -725,26 +732,9 @@ def user_answers(request, user_id):
 @login_required
 def user_notifications(request, user_id):
     if str(user_id) == str(request.user.id):
-        notifications = list(
-            Notification.objects.filter(uid=user_id).order_by('-date_created')
-        )
-
-        # Prefetch related questions, answers and posters in bulk
-        qids = {n.qid for n in notifications if n.qid}
-        aids = {n.aid for n in notifications if n.aid}
-        pids = {n.pid for n in notifications if n.pid}
-
-        questions = {q.id: q for q in Question.objects.filter(id__in=qids)}
-        answers = {a.id: a for a in Answer.objects.filter(id__in=aids)}
-        users = {u.id: u.username for u in User.objects.filter(id__in=pids)}
-
-        for n in notifications:
-            n.cached_question = questions.get(n.qid)
-            n.cached_answer = answers.get(n.aid)
-            n.cached_poster = users.get(n.pid, "Unknown User")
-
+        notifications = Notification.objects.filter(uid=user_id).order_by('date_created').reverse()
         context = {
-            'notifications': notifications,
+            'notifications': notifications
         }
         return render(request, 'website/templates/notifications.html', context)
     return HttpResponse("go away ...")
@@ -908,22 +898,13 @@ def ajax_similar_questions(request):
         user_title = clean_user_data(title)
         # Increase the threshold as the Forums questions increase
         THRESHOLD = 0.3
-        MAX_CANDIDATES = 200
-        MAX_RESULTS = 20
-
         top_ques = []
-        # Limit number of candidate questions to keep CPU usage bounded
-        questions = Question.objects.filter(
-            category=category,
-            tutorial=tutorial,
-        ).order_by('-date_created')[:MAX_CANDIDATES]
-
+        questions = Question.objects.filter(category=category,tutorial=tutorial)
         for question in questions:
-            question.similarity = get_similar_questions(user_title, question.title)
-            if question.similarity >= THRESHOLD:
+             question.similarity= get_similar_questions(user_title,question.title)
+             if question.similarity >= THRESHOLD:
                 top_ques.append(question)
-
-        top_ques = sorted(top_ques, key=lambda x: x.similarity, reverse=True)[:MAX_RESULTS]
+        top_ques = sorted(top_ques,key=lambda x : x.similarity, reverse=True)
         context = {
             'questions': top_ques,
             'questions_count':len(top_ques)
@@ -976,23 +957,18 @@ def ajax_keyword_search(request):
         questions = Question.objects.filter(
             Q(title__icontains=key) | Q(category__icontains=key) |
             Q(tutorial__icontains=key) | Q(body__icontains=key), status=1
-        ).annotate(total_answers=Count('answer')).order_by('-date_created')
-
+            ).order_by('-date_created')
         paginator = Paginator(questions, 20)
         page = request.POST.get('page')
+        if page:
+            page = int(request.POST.get('page'))
+            questions = paginator.page(page)
         try:
             questions = paginator.page(page)
         except PageNotAnInteger:
             questions = paginator.page(1)
         except EmptyPage:
             questions = paginator.page(paginator.num_pages)
-
-        # Attach cached usernames for the current page
-        uids = {q.uid for q in questions}
-        users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
-        for q in questions:
-            q.cached_user = users.get(q.uid, "Unknown User")
-
         context = {
             'questions': questions
         }
@@ -1005,38 +981,19 @@ def ajax_time_search(request):
         tutorial = request.POST.get('tutorial')
         minute_range = request.POST.get('minute_range')
         second_range = request.POST.get('second_range')
-        questions = Question.objects.none()
+        questions = None
         if category:
-            questions = Question.objects.filter(
-                category=category.replace(' ', '-'),
-                status=1,
-            )
+            questions = Question.objects.filter(category=category.replace(' ', '-'), status=1)
         if tutorial:
             questions = questions.filter(tutorial=tutorial.replace(' ', '-'))
         if minute_range:
-            questions = questions.filter(minute_range=minute_range)
+            questions = questions.filter(category=category.replace(
+                ' ', '-'), tutorial=tutorial.replace(' ', '-'), minute_range=minute_range)
         if second_range:
-            questions = questions.filter(second_range=second_range)
-
-        questions = questions.annotate(total_answers=Count('answer')).order_by('-date_created')
-
-        paginator = Paginator(questions, 20)
-        page = request.POST.get('page')
-        try:
-            questions = paginator.page(page)
-        except PageNotAnInteger:
-            questions = paginator.page(1)
-        except EmptyPage:
-            questions = paginator.page(paginator.num_pages)
-
-        # Attach cached usernames for the current page
-        uids = {q.uid for q in questions}
-        users = {u.id: u.username for u in User.objects.filter(id__in=uids)}
-        for q in questions:
-            q.cached_user = users.get(q.uid, "Unknown User")
-
+            questions = questions.filter(category=category.replace(
+                ' ', '-'), tutorial=tutorial.replace(' ', '-'), second_range=second_range)
         context = {
-            'questions': questions,
+            'questions': questions
         }
         return render(request, 'website/templates/ajax-time-search.html', context)
 
@@ -1061,30 +1018,27 @@ def forums_mail(to='', subject='', message=''):
 
 
 def unanswered_notification(request):
-    unanswered_questions = (
-        Question.objects.filter(status=1)
-        .annotate(answer_count=Count('answer'))
-        .filter(answer_count=0)
-    )
+    questions = Question.objects.filter(status=1)
     total_count = 0
     message = """
         The following questions are left unanswered.
         Please take a look at them. <br><br>
     """
-    for question in unanswered_questions:
-        total_count += 1
-        message += """
-            #{0}<br>
-            Title: <b>{1}</b><br>
-            Category: <b>{2}</b><br>
-            Link: <b>{3}</b><br>
-            <hr>
-        """.format(
-            total_count,
-            question.title,
-            question.category,
-            'http://forums.spoken-tutorial.org/question/' + str(question.id)
-        )
+    for question in questions:
+        if not question.answer_set.count():
+            total_count += 1
+            message += """
+                #{0}<br>
+                Title: <b>{1}</b><br>
+                Category: <b>{2}</b><br>
+                Link: <b>{3}</b><br>
+                <hr>
+            """.format(
+                total_count,
+                question.title,
+                question.category,
+                'http://forums.spoken-tutorial.org/question/' + str(question.id)
+            )
     to = "team@spoken-tutorial.org, team@fossee.in"
     subject = "Unanswered questions in the forums."
     if total_count:
