@@ -38,4 +38,7 @@ urlpatterns = [
     url(r'^ajax-time-search/$', views.ajax_time_search, name='ajax_time_search'),
     url(r'^ajax-delete-question/$', views.ajax_delete_question, name='ajax_delete_question'),
     url(r'^ajax-hide-question/$', views.ajax_hide_question, name='ajax_hide_question'),
+
+    #captcha
+    url(r'^verify-filter-access/$', views.verify_filter_access, name='verify_filter_access'),
 ]
