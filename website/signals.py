@@ -55,7 +55,7 @@ def _send_webhook(payload):
     Fails silently — the forum must keep working even if the Social app is down.
     """
     
-    webhook_url = "http://localhost:8000/api/webhooks/forum" 
+    webhook_url = "https://social.edupyramids.org/api/webhooks/forum" 
 
     if not webhook_url:
         return  
