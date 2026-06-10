@@ -92,7 +92,7 @@ def _get_home_spam_questions(base_queryset):
     spam_questions = cache.get(cache_key)
     if spam_questions is not None:
         return spam_questions
-    spam_questions = list(base_queryset.filter(status=2).order_by('-last_active')[:100])
+    spam_questions = list(base_queryset.filter(status=2).order_by('-date_created'))
     cache.set(cache_key, spam_questions, HOME_CACHE_TIMEOUT)
     return spam_questions
 
