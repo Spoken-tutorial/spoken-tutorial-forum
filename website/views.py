@@ -671,6 +671,28 @@ def new_question(request):
         tutorial = request.GET.get('tutorial', None)
         minute_range = request.GET.get('minute_range', None)
         second_range = request.GET.get('second_range', None)
+
+        if not (category or tutorial or minute_range or second_range):
+            referer = request.META.get('HTTP_REFERER')
+            if referer:
+                import re
+                from urllib.parse import urlparse
+                path = urlparse(referer).path
+                # Match /question/<question_id>/
+                match = re.search(r'/question/(\d+)/', path)
+                if match:
+                    question_id = match.group(1)
+                    try:
+                        from website.models import Question
+                        question = Question.objects.get(id=question_id)
+                        # Replace hyphens with spaces to match ChoiceField choice values
+                        category = question.category.replace('-', ' ')
+                        tutorial = question.tutorial.replace('-', ' ')
+                        minute_range = question.minute_range
+                        second_range = question.second_range
+                    except Question.DoesNotExist:
+                        pass
+
         # pass minute_range and second_range value to NewQuestionForm to populate on select
         form = NewQuestionForm(category=category, tutorial=tutorial,
                                minute_range=minute_range, second_range=second_range)

@@ -10,9 +10,17 @@ seconds = ()
 
 
 class NewQuestionForm(forms.Form):
-    category = forms.ChoiceField(choices=[('', 'Select a Category'), ] + list(TutorialResources.objects.filter(
-        Q(status=1) | Q(status=2), language__name='English',tutorial_detail__foss__show_on_homepage=1).values_list('tutorial_detail__foss__foss',
-                                                       'tutorial_detail__foss__foss').distinct()),
+    category_list = sorted(
+        list(TutorialResources.objects.filter(
+            Q(status=1) | Q(status=2),
+            language__name='English',
+            tutorial_detail__foss__show_on_homepage=1
+        ).values_list('tutorial_detail__foss__foss', 'tutorial_detail__foss__foss').distinct()),
+        key=lambda x: x[0].lower() if x[0] else ""
+    )
+
+    category = forms.ChoiceField(
+        choices=[('', 'Select a Category'), ] + category_list,
         widget=forms.Select(attrs={}), required=True, error_messages={'required': 'State field is required.'})
     title = forms.CharField(max_length=200)
     body = forms.CharField(widget=forms.Textarea())
