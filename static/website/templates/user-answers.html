@@ -6,7 +6,7 @@
     {% for answer in answers%}
         <div class="my-answer">
             <span class="body">
-                <a href="{% url 'website:get_question' answer.question.id %}#answer{{ answer.id }}">{{ answer.body|bleach }}</a>
+                <a href="{% url 'website:get_question' answer.question.id %}#answer{{ answer.id }}">{{ answer.body|safe }}</a>
             </span>
             <br>
             <span class="date">
