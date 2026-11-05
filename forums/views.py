@@ -1,6 +1,6 @@
 from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth import login, logout
-from django.shortcuts import render_to_response
+from django.shortcuts import render, render_to_response
 from django.template.context_processors import csrf
 
 from forums.forms import UserLoginForm
@@ -29,7 +29,7 @@ def user_login(request):
             'resetpasssucs': resetpasssucs
         }
         context.update(csrf(request))
-        return render_to_response('forums/templates/user-login.html', context)
+        return render(request, 'forums/templates/user-login.html', context)
     else:
         return HttpResponseRedirect('/')
 

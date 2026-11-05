@@ -91,6 +91,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'website.context_processors.spoken_urls',
             ],
         },
     },
@@ -227,7 +228,8 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     "django.core.context_processors.static",
     "django.core.context_processors.tz",
     "django.contrib.messages.context_processors.messages",
-    "django.core.context_processors.request"
+    "django.core.context_processors.request",
+    "website.context_processors.spoken_urls",
 )
 
 STATICFILES_FINDERS = (
@@ -324,3 +326,12 @@ LOGGING = {
 }
 
 VIDEO_PATH = os.getenv("VIDEO_PATH")
+
+# URLs configuration from environment
+PROCESS_URL = os.getenv('PROCESS_URL', 'https://process.spoken-tutorial.org')
+FORUMS_SPOKEN_URL = os.getenv('FORUMS_SPOKEN_URL', 'https://forums.spoken-tutorial.org')
+FORUMS_URL = os.getenv('FORUMS_URL', FORUMS_SPOKEN_URL)
+SPOKEN_BASE_URL = os.getenv('SPOKEN_BASE_URL', 'https://spoken-tutorial.org')
+EDUPYRAMIDS_URL = os.getenv('EDUPYRAMIDS_URL', 'https://spoken-tutorial.org')
+IS_EDU_URL = os.getenv('IS_EDU_URL', 'True').lower() in ('true', '1')
+SPOKEN_URL = os.getenv('SPOKEN_URL', EDUPYRAMIDS_URL if (IS_EDU_URL and EDUPYRAMIDS_URL != 'https://spoken-tutorial.org') else SPOKEN_BASE_URL)

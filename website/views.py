@@ -24,6 +24,7 @@ from forums.views import user_logout
 from website.permissions import is_administrator, is_forumsadmin
 
 from forums.settings import RECAPTCHA_SECRET_KEY_v3
+FORUMS_SPOKEN_URL = getattr(settings, 'FORUMS_SPOKEN_URL', 'https://forums.spoken-tutorial.org')
 User = get_user_model()
 
 HOME_CACHE_TIMEOUT = 3600
@@ -383,7 +384,7 @@ def question_answer(request):
                         """.format(
                             user.username,
                             question.title,
-                            'http://forums.spoken-tutorial.org/question/' + str(question.id) + "#answer" + str(answer.id)
+                            f"{FORUMS_SPOKEN_URL}/question/{question.id}#answer{answer.id}"
                         )
 
                         email = EmailMultiAlternatives(
@@ -433,7 +434,7 @@ def answer_comment(request):
                 Spoken Tutorial Forums
             """.format(
                 user.username,
-                "http://forums.spoken-tutorial.org/question/" + str(answer.question.id) + "#answer" + str(answer.id)
+                f"{FORUMS_SPOKEN_URL}/question/{answer.question.id}#answer{answer.id}"
             )
             forums_mail(user.email, subject, message)
 
@@ -461,7 +462,7 @@ def answer_comment(request):
                 Spoken Tutorial Forums
             """.format(
                 user.username,
-                "http://forums.spoken-tutorial.org/question/" + str(answer.question.id) + "#answer" + str(answer.id)
+                f"{FORUMS_SPOKEN_URL}/question/{answer.question.id}#answer{answer.id}"
             )
             forums_mail(user.email, subject, message)
     return HttpResponseRedirect("/question/" + str(answer.question.id) + "#")
@@ -632,8 +633,8 @@ def new_question(request):
                     Title: <b>{question.title}</b><br>
                     Category: <b>{question.category}</b><br>
                     Tutorial: <b>{question.tutorial}</b><br>
-                    Link: <a href="http://forums.spoken-tutorial.org/question/{question.id}">
-                        http://forums.spoken-tutorial.org/question/{question.id}
+                    Link: <a href="{FORUMS_SPOKEN_URL}/question/{question.id}">
+                        {FORUMS_SPOKEN_URL}/question/{question.id}
                     </a><br>
                     Question: <b>{question.body}</b><br>
                 """
@@ -1059,7 +1060,7 @@ def unanswered_notification(request):
                 total_count,
                 question.title,
                 question.category,
-                'http://forums.spoken-tutorial.org/question/' + str(question.id)
+                f"{FORUMS_SPOKEN_URL}/question/{question.id}"
             )
     to = "team@spoken-tutorial.org, team@fossee.in"
     subject = "Unanswered questions in the forums."
