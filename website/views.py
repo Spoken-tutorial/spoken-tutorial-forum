@@ -384,7 +384,7 @@ def question_answer(request):
                         """.format(
                             user.username,
                             question.title,
-                            f"{FORUMS_SPOKEN_URL}/question/{question.id}#answer{answer.id}"
+                            request.build_absolute_uri(f"/question/{question.id}#answer{answer.id}")
                         )
 
                         email = EmailMultiAlternatives(
@@ -434,7 +434,7 @@ def answer_comment(request):
                 Spoken Tutorial Forums
             """.format(
                 user.username,
-                f"{FORUMS_SPOKEN_URL}/question/{answer.question.id}#answer{answer.id}"
+                request.build_absolute_uri(f"/question/{answer.question.id}#answer{answer.id}")
             )
             forums_mail(user.email, subject, message)
 
@@ -462,7 +462,7 @@ def answer_comment(request):
                 Spoken Tutorial Forums
             """.format(
                 user.username,
-                f"{FORUMS_SPOKEN_URL}/question/{answer.question.id}#answer{answer.id}"
+                request.build_absolute_uri(f"/question/{answer.question.id}#answer{answer.id}")
             )
             forums_mail(user.email, subject, message)
     return HttpResponseRedirect("/question/" + str(answer.question.id) + "#")
@@ -627,14 +627,15 @@ def new_question(request):
             question.save()
             #send update mail only for verified users, to avoid spam mail
             if user_has_role:
+                question_url = request.build_absolute_uri(f"/question/{question.id}")
                 subject = 'New Forum Question'
                 message = f"""
                     The following new question has been posted in the Spoken Tutorial Forum: <br>
                     Title: <b>{question.title}</b><br>
                     Category: <b>{question.category}</b><br>
                     Tutorial: <b>{question.tutorial}</b><br>
-                    Link: <a href="{FORUMS_SPOKEN_URL}/question/{question.id}">
-                        {FORUMS_SPOKEN_URL}/question/{question.id}
+                    Link: <a href="{question_url}">
+                        {question_url}
                     </a><br>
                     Question: <b>{question.body}</b><br>
                 """
@@ -1060,7 +1061,7 @@ def unanswered_notification(request):
                 total_count,
                 question.title,
                 question.category,
-                f"{FORUMS_SPOKEN_URL}/question/{question.id}"
+                request.build_absolute_uri(f"/question/{question.id}") if request else f"{FORUMS_SPOKEN_URL}/question/{question.id}"
             )
     to = "team@spoken-tutorial.org, team@fossee.in"
     subject = "Unanswered questions in the forums."
