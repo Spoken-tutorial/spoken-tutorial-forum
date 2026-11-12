@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import threading
 
 import requests
@@ -55,7 +56,7 @@ def _send_webhook(payload):
     Fails silently — the forum must keep working even if the Social app is down.
     """
     
-    webhook_url = "https://social.edupyramids.org/api/webhooks/forum" 
+    webhook_url = os.getenv('SOCIAL_WEBHOOK_URL', "https://social.edupyramids.org/api/webhooks/forum") 
 
     if not webhook_url:
         return  

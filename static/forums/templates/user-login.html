@@ -4,7 +4,7 @@
 <br><br><br>
 <div class="row">
     <div class="col-lg-6" style="border-right: 1px dashed #424242;">
-        <h4>Please login with your <br>Spoken-Tutorial.org account.</h4>
+        <h4>Please login with your <br>{{ SPOKEN_NAME }} account.</h4>
         <form action="/accounts/login/" method="POST"> {% csrf_token %}
             {% if form.errors %}
             <div class="alert alert-danger">
@@ -32,7 +32,7 @@
                     <input type="hidden" name="next" value="{{ next }}">
                 {% endif %}
                 <input class="btn btn-sm btn-primary" type="submit" value="Login">
-		<span style="margin-left:30px;"><a href="http://spoken-tutorial.org/accounts/forgot-password/?next=http://forums.spoken-tutorial.org/accounts/login/?resetpass=success">Forgot Password?</a></span>
+		<span style="margin-left:30px;"><a href="{{ SPOKEN_URL }}/accounts/forgot-password/?next={{ FORUMS_URL }}/accounts/login/?resetpass=success">Forgot Password?</a></span>
             {% endwith %}
         </form>
     </div> <!-- /.col -->
@@ -46,9 +46,9 @@
             <li>This is not a place for self promotion.</li>
             <li>Any violation of the above may lead to the permanent account deletion.</li>
         </ul>
-        <h4>Don't have a <a style="color:blue;" href="https://spoken-tutorial.org/">spoken-tutorial.org</a> account yet?</h4>
+        <h4>Don't have a <a style="color:blue;" href="{{ SPOKEN_URL }}/">{{ SPOKEN_DOMAIN }}</a> account yet?</h4>
         <p>
-            <a class="btn  btn-sm btn-success" href="http://www.spoken-tutorial.org/accounts/register/" target="_blank">Register</a>
+            <a class="btn  btn-sm btn-success" href="{{ SPOKEN_URL }}/accounts/register/" target="_blank">Register</a>
         </p>
     </div> <!-- /.col -->
 </div> <!-- /.row -->
